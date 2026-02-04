@@ -1,3 +1,6 @@
+# IDE
+.idea
+
 # Local Dependencies
 node_modules/
 package-lock.json
