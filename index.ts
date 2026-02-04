@@ -13,7 +13,7 @@ import path from "path";
 
 const server = new McpServer({
   name: "subconductor",
-  version: "1.0.0",
+  version: "1.0.1",
 });
 
 const WORKING_DIR = path.join(process.cwd(), ".subconductor");
