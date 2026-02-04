@@ -4,6 +4,14 @@
   "license": "Apache-2.0",
   "description": "Subconductor is an MCP server that acts as a Persistent State Machine for AI agents. It prevents 'context drift' during long refactors by externalizing the task list into a physical manifest. It enables non-linear execution, allowing agents to handle dependencies dynamically while maintaining a transparent, resumable audit trail.",
   "author": "Paul Benchea",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PaulBenchea/mcp-subconductor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PaulBenchea/mcp-subconductor/issues"
+  },
+  "homepage": "https://github.com/PaulBenchea/mcp-subconductor#readme",
   "type": "module",
   "main": "index.js",
   "bin": {
