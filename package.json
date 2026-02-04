@@ -1,0 +1,25 @@
+{
+  "name": "@psno/subconductor",
+  "version": "1.0.0",
+  "description": "Subconductor is an MCP server that acts as a Persistent State Machine for AI agents. It prevents 'context drift' during long refactors by externalizing the task list into a physical manifest. It enables non-linear execution, allowing agents to handle dependencies dynamically while maintaining a transparent, resumable audit trail.",
+  "author": "Paul Benchea",
+  "license": "Apache-2.0",
+  "bin": "./index.js",
+  "files": [
+    "index.js",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "zod": "^3.25 || ^4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.0",
+    "typescript": "^5.9.3"
+  }
+}
