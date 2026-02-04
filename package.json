@@ -6,7 +6,9 @@
   "author": "Paul Benchea",
   "type": "module",
   "main": "index.js",
-  "bin": "./index.js",
+  "bin": {
+    "subconductor": "./index.js"
+  },
   "files": [
     "index.js",
     "LICENSE",
