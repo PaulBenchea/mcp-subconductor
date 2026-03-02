@@ -17,21 +17,34 @@ Add Subconductor to your MCP-compatible host (e.g., Claude Desktop or Gemini) us
 ## Tools Included
 
 ### `init_checklist`
-Initializes a new project state and generates the tracking infrastructure.
+Initialize a new checklist
 - **Arguments**: 
-  - `paths` (string[]): List of file paths relevant to the task.
+  - `tasks` (string[]): List of tasks to perform (e.g., file paths, function names, or high-level goals).
   - `goal` (string): The high-level objective of the workflow.
 - **Effect**: Creates a `.subconductor/tasks.md` file with the goal and a markdown checklist.
 
 ### `get_pending_task`
 Retrieves the next uncompleted task from the checklist.
-- **Effect**: Reads the `.subconductor/tasks.md` file and returns the first file path marked with `- [ ]`. Returns `DONE` if all tasks are completed.
+- **Effect**: Returns the first task name marked with `- [ ]`. Returns `DONE` if all tasks are completed.
+
+### `get_pending_tasks`
+Retrieves a batch of uncompleted tasks.
+- **Arguments**:
+  - `count` (number): The number of pending tasks to retrieve (default: 5).
+- **Effect**: Returns a list of tasks or `DONE`.
 
 ### `mark_task_done`
 Updates a specific task's status to completed.
 - **Arguments**: 
-  - `path` (string): The exact file path to mark as completed.
-- **Effect**: Updates the checkbox for the specified path from `- [ ]` to `- [x]` in the `.subconductor/tasks.md` file. It automatically triggers a system-level notification when the final task in the checklist is completed.
+  - `task` (string): The exact task name to mark as completed.
+  - `note` (string, optional): An additional note or status message to append to the task.
+- **Effect**: Updates the checkbox from `- [ ]` to `- [x]` and appends any provided note in the manifest. Automatically triggers a notification upon completion of the final task.
+
+### `mark_tasks_done`
+Marks multiple tasks as completed in a single operation.
+- **Arguments**:
+  - `tasks` (object[]): List of tasks with `name` and optional `note`.
+- **Effect**: Batch-updates task states and records logs in the manifest.
 
 ### `alert`
 Sends a system-level notification with sound and icon support.
