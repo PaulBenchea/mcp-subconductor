@@ -41,7 +41,7 @@ export function registerTaskTools(server: McpServer) {
     'get_pending_tasks',
     {
       inputSchema: {
-        count: z.number().optional().default(5).describe('The number of pending tasks to retrieve')
+        count: z.number().int().min(1).max(50).optional().default(5).describe('The number of pending tasks to retrieve')
       }
     },
     async ({ count }) => {
@@ -89,11 +89,18 @@ export function registerTaskTools(server: McpServer) {
       }
     },
     async ({ tasks }) => {
-      const results = await taskService.markTasksDone(tasks);
-      const summary = results.map(r => `${r.name}: ${r.success ? 'Success' : 'Failed'}`).join('\n');
-      return {
-        content: [{ type: 'text', text: summary }]
-      };
+      try {
+        const results = await taskService.markTasksDone(tasks);
+        const summary = results.map(r => `${r.name}: ${r.success ? 'Success' : 'Failed'}`).join('\n');
+        return {
+          content: [{ type: 'text', text: summary }]
+        };
+      }
+      catch (err: any) {
+        return {
+          content: [{ type: 'text', text: err.message }]
+        };
+      }
     }
   );
 }
