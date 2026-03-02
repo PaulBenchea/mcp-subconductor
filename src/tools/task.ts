@@ -7,7 +7,7 @@ export function registerTaskTools(server: McpServer) {
     'init_checklist',
     {
       inputSchema: {
-        tasks: z.array(z.string()).describe('List of tasks to perform (e.g., file paths, function names)'),
+        tasks: z.array(z.string()).describe('List of tasks to perform.'),
         goal: z.string().describe('The overall goal of this subconductor run')
       }
     },
@@ -41,11 +41,12 @@ export function registerTaskTools(server: McpServer) {
     'mark_task_done',
     {
       inputSchema: {
-        task: z.string().describe('The task name to mark as completed')
+        task: z.string().describe('The task name to mark as completed'),
+        note: z.string().optional().describe('An optional note to add or append to the task')
       }
     },
-    async ({ task }) => {
-      const success = await taskService.markTaskDone(task);
+    async ({ task, note }) => {
+      const success = await taskService.markTaskDone(task, note);
       return {
         content: [{
           type: 'text',
