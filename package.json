@@ -18,7 +18,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "subconductor": "./dist/index.js"
+    "subconductor": "dist/index.js"
   },
   "files": [
     "dist",
@@ -31,7 +31,6 @@
     "copy-assets": "node scripts/copy-assets.js",
     "test": "echo \"Tests skipped\" && exit 0"
   },
-
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.26.0",
     "node-notifier": "^10.0.1",
