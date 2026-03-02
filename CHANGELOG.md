@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2026-03-02
+
+### Added
+- **Batch Operations**: Introduced `get_pending_tasks` and `mark_tasks_done` tools to handle multiple tasks in a single call, significantly improving workflow efficiency.
+- **Task Notes**: Added support for optional notes when marking tasks as complete. Notes are persisted in the manifest and can be appended (using `|` separator) if a task is updated multiple times.
+
+### Changed
+- **Task Generalization**: Refactored `init_checklist` and `mark_task_done` to support any string-based task (e.g., function names, architectural goals) instead of being restricted to file paths.
+
+### Fixed
+- Improved task matching logic in `mark_task_done` to ensure precise identification even when complex notes are present in the manifest.
+
 ## [1.0.3] - 2026-03-02
 
 ### Added
