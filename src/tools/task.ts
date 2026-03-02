@@ -7,14 +7,14 @@ export function registerTaskTools(server: McpServer) {
     'init_checklist',
     {
       inputSchema: {
-        paths: z.array(z.string()).describe('List of file paths to refactor'),
+        tasks: z.array(z.string()).describe('List of tasks to perform (e.g., file paths, function names)'),
         goal: z.string().describe('The overall goal of this subconductor run')
       }
     },
-    async ({ paths, goal }) => {
-      const count = await taskService.initChecklist(paths, goal);
+    async ({ tasks, goal }) => {
+      const count = await taskService.initChecklist(tasks, goal);
       return {
-        content: [{ type: 'text', text: `Checklist created with ${count} files.` }]
+        content: [{ type: 'text', text: `Checklist created with ${count} tasks.` }]
       };
     }
   );
@@ -41,15 +41,15 @@ export function registerTaskTools(server: McpServer) {
     'mark_task_done',
     {
       inputSchema: {
-        path: z.string().describe('The file path to mark as completed')
+        task: z.string().describe('The task name to mark as completed')
       }
     },
-    async ({ path: filePath }) => {
-      const success = await taskService.markTaskDone(filePath);
+    async ({ task }) => {
+      const success = await taskService.markTaskDone(task);
       return {
         content: [{
           type: 'text',
-          text: success ? `Marked ${filePath} as completed.` : `Task ${filePath} not found or already completed.`
+          text: success ? `Marked ${task} as completed.` : `Task ${task} not found or already completed.`
         }]
       };
     }
