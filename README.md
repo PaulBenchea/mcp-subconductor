@@ -1,10 +1,10 @@
 # Subconductor
 
-A persistent state machine for AI agents to manage complex, multi-step workflows via the Model Context Protocol (MCP).
+A persistent state machine and notification system for AI agents to manage complex, multi-step workflows via the Model Context Protocol (MCP).
 
-Subconductor prevents "context drift" by maintaining a single source of truth for project progress in a local `.subconductor/tasks.md` file. This allows agents to "remember" their exact state, completed milestones, and remaining blockers across multiple sessions.
+Subconductor prevents "context drift" by maintaining a single source of truth for project progress in a local `.subconductor/tasks.md` file. It keeps the user informed through a robust notification system that triggers during long-running tasks or checklist completion. This allows agents to "remember" their exact state, completed milestones, and remaining blockers across multiple sessions.
 
-## 🚀 Quick Start
+## Quick Start
 
 Add Subconductor to your MCP-compatible host (e.g., Claude Desktop or Gemini) using `npx`:
 
@@ -31,9 +31,17 @@ Retrieves the next uncompleted task from the checklist.
 Updates a specific task's status to completed.
 - **Arguments**: 
   - `path` (string): The exact file path to mark as completed.
-- **Effect**: Updates the checkbox for the specified path from `- [ ]` to `- [x]` in the `.subconductor/tasks.md` file.
+- **Effect**: Updates the checkbox for the specified path from `- [ ]` to `- [x]` in the `.subconductor/tasks.md` file. It automatically triggers a system-level notification when the final task in the checklist is completed.
 
-## ⚖️ License & Attribution
+### `alert`
+Sends a system-level notification with sound and icon support.
+- **Arguments**:
+  - `title` (string): The title of the notification.
+  - `message` (string): The message body.
+  - `status` ('info' | 'warn' | 'error'): The severity level (default: 'info').
+- **Effect**: Triggers a desktop notification with status-specific icons and sounds.
+
+## License & Attribution
 
 This project is licensed under the **Apache License 2.0**.
 
