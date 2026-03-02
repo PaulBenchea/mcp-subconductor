@@ -2,7 +2,7 @@ import path from 'path';
 
 export const APP_ID = 'Subconductor';
 export const APP_NAME = 'Subconductor';
-export const APP_VERSION = '1.0.2';
+export const APP_VERSION = '1.0.3';
 
 export const WORKING_DIR = path.join(process.cwd(), '.subconductor');
 export const TASK_FILE = path.join(WORKING_DIR, 'tasks.md');
