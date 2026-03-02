@@ -1,14 +1,13 @@
 import fs from 'fs/promises';
-import { WORKING_DIR, TASK_FILE } from '../config/constants.js';
+import { TASK_FILE, WORKING_DIR } from '../models/constants.js';
+import { AlertType } from '../models/enums.js';
 import { notificationService } from './notification.service.js';
 
 export class TaskService {
   async ensureInit(): Promise<void> {
     try {
       await fs.mkdir(WORKING_DIR, { recursive: true });
-    } catch (e) {
-      // Directory might already exist
-    }
+    } catch (e) {}
   }
 
   async initChecklist(paths: string[], goal: string): Promise<number> {
@@ -50,7 +49,7 @@ export class TaskService {
     const hasPending = lines.some(l => l.startsWith('- [ ] '));
     
     if (!hasPending) {
-      await notificationService.alert('Checklist Complete', 'All tasks in your manifest are finished!', 'info');
+      await notificationService.alert('Checklist Complete', 'All tasks in your manifest are finished!', AlertType.Info);
     }
 
     return true;
