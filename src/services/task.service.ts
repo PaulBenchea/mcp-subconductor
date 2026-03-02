@@ -34,6 +34,30 @@ export class TaskService {
     }
   }
 
+  async getPendingTasks(count: number = 5): Promise<string[]> {
+    await this.ensureInit();
+    try {
+      const data = await fs.readFile(TASK_FILE, 'utf-8');
+      const lines = data.split('\n');
+      return lines
+        .filter(l => l.startsWith('- [ ] '))
+        .slice(0, count)
+        .map(l => l.replace('- [ ] ', '').trim());
+    } catch (err) {
+      throw new Error('No active checklist found. Run init_checklist first.');
+    }
+  }
+
+  async markTasksDone(tasks: { name: string, note?: string }[]): Promise<{ name: string, success: boolean }[]> {
+    await this.ensureInit();
+    const results = [];
+    for (const t of tasks) {
+      const success = await this.markTaskDone(t.name, t.note);
+      results.push({ name: t.name, success });
+    }
+    return results;
+  }
+
   async markTaskDone(taskName: string, note?: string): Promise<boolean> {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
