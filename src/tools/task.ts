@@ -38,6 +38,28 @@ export function registerTaskTools(server: McpServer) {
   );
 
   server.registerTool(
+    'get_pending_tasks',
+    {
+      inputSchema: {
+        count: z.number().optional().default(5).describe('The number of pending tasks to retrieve')
+      }
+    },
+    async ({ count }) => {
+      try {
+        const tasks = await taskService.getPendingTasks(count);
+        return {
+          content: [{ type: 'text', text: tasks.length > 0 ? tasks.join('\n') : 'DONE' }]
+        };
+      }
+      catch (err: any) {
+        return {
+          content: [{ type: 'text', text: err.message }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     'mark_task_done',
     {
       inputSchema: {
@@ -52,6 +74,25 @@ export function registerTaskTools(server: McpServer) {
           type: 'text',
           text: success ? `Marked ${task} as completed.` : `Task ${task} not found or already completed.`
         }]
+      };
+    }
+  );
+
+  server.registerTool(
+    'mark_tasks_done',
+    {
+      inputSchema: {
+        tasks: z.array(z.object({
+          name: z.string(),
+          note: z.string().optional()
+        })).describe('List of tasks to mark as completed')
+      }
+    },
+    async ({ tasks }) => {
+      const results = await taskService.markTasksDone(tasks);
+      const summary = results.map(r => `${r.name}: ${r.success ? 'Success' : 'Failed'}`).join('\n');
+      return {
+        content: [{ type: 'text', text: summary }]
       };
     }
   );
