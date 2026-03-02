@@ -1,6 +1,6 @@
 {
   "name": "@psno/subconductor",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "license": "Apache-2.0",
   "description": "Subconductor is an MCP server that acts as a Persistent State Machine for AI agents. It prevents 'context drift' during long refactors by externalizing the task list into a physical manifest. It enables non-linear execution, allowing agents to handle dependencies dynamically while maintaining a transparent, resumable audit trail.",
   "author": "Paul Benchea",
@@ -13,26 +13,51 @@
   },
   "homepage": "https://github.com/PaulBenchea/mcp-subconductor#readme",
   "type": "module",
-  "main": "index.js",
+  "main": "dist/index.js",
   "bin": {
-    "subconductor": "./index.js"
+    "subconductor": "./dist/index.js"
   },
   "files": [
-    "index.js",
+    "dist",
     "LICENSE",
     "NOTICE",
     "README.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "node scripts/copy-assets.js",
     "test": "echo \"Tests skipped\" && exit 0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@modelcontextprotocol/sdk": "1.26.0",
+    "node-notifier": "^10.0.1",
     "zod": "^3.25 || ^4.0"
   },
   "devDependencies": {
     "@types/node": "^25.2.0",
+    "@types/node-notifier": "^8.0.5",
     "typescript": "^5.9.3"
-  }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "ai-agents",
+    "agentic-workflows",
+    "state-machine",
+    "workflow-automation",
+    "persistent-state",
+    "task-management",
+    "task-tracking",
+    "claude-desktop",
+    "claude-code",
+    "cursor-ide",
+    "windsurf",
+    "goose-cli",
+    "llm-tools",
+    "developer-productivity",
+    "typescript",
+    "node",
+    "automation"
+  ]
 }
