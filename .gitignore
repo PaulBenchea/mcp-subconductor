@@ -12,3 +12,4 @@ index.d.ts.map
 
 # Local Task Data
 .subconductor/
+/dist/
