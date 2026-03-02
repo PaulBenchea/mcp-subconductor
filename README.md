@@ -14,7 +14,7 @@ Add Subconductor to your MCP-compatible host (e.g., Claude Desktop or Gemini) us
   "args": ["-y", "@psno/subconductor"]
 }
 ```
-## 🛠 Tools Included
+## Tools Included
 
 ### `init_checklist`
 Initializes a new project state and generates the tracking infrastructure.
@@ -40,6 +40,9 @@ Sends a system-level notification with sound and icon support.
   - `message` (string): The message body.
   - `status` ('info' | 'warn' | 'error'): The severity level (default: 'info').
 - **Effect**: Triggers a desktop notification with status-specific icons and sounds.
+
+## Resources
+**[Changelog](./CHANGELOG.md)** - Check out the latest changes.
 
 ## License & Attribution
 
