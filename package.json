@@ -24,7 +24,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "echo \"Tests skipped\" && exit 0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.3",
