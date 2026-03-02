@@ -10,11 +10,11 @@ export class TaskService {
     } catch (e) {}
   }
 
-  async initChecklist(paths: string[], goal: string): Promise<number> {
+  async initChecklist(tasks: string[], goal: string): Promise<number> {
     await this.ensureInit();
-    const content = `# Goal: ${goal}\n\n${paths.map(p => `- [ ] ${p}`).join('\n')}`;
+    const content = `# Goal: ${goal}\n\n${tasks.map(t => `- [ ] ${t}`).join('\n')}`;
     await fs.writeFile(TASK_FILE, content);
-    return paths.length;
+    return tasks.length;
   }
 
   async getPendingTask(): Promise<string | null> {
@@ -34,15 +34,15 @@ export class TaskService {
     }
   }
 
-  async markTaskDone(filePath: string): Promise<boolean> {
+  async markTaskDone(task: string): Promise<boolean> {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
     
-    if (!data.includes(`- [ ] ${filePath}`)) {
+    if (!data.includes(`- [ ] ${task}`)) {
       return false;
     }
 
-    data = data.replace(`- [ ] ${filePath}`, `- [x] ${filePath}`);
+    data = data.replace(`- [ ] ${task}`, `- [x] ${task}`);
     await fs.writeFile(TASK_FILE, data);
 
     const lines = data.split('\n');
