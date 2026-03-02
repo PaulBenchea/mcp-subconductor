@@ -34,18 +34,33 @@ export class TaskService {
     }
   }
 
-  async markTaskDone(task: string): Promise<boolean> {
+  async markTaskDone(taskName: string, note?: string): Promise<boolean> {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const lines = data.split('\n');
     
-    if (!data.includes(`- [ ] ${task}`)) {
+    const taskIndex = lines.findIndex(l =>
+      l.startsWith(`- [ ] ${taskName}`) && (l.length === (`- [ ] ${taskName}`).length
+        || l.startsWith(`- [ ] ${taskName}:`)));
+    
+    if (taskIndex === -1) {
       return false;
     }
 
-    data = data.replace(`- [ ] ${task}`, `- [x] ${task}`);
-    await fs.writeFile(TASK_FILE, data);
+    const currentLine = lines[taskIndex];
+    let newLine = currentLine.replace('- [ ] ', '- [x] ');
+    
+    if (note) {
+      if (newLine.includes(': ')) {
+        newLine += ` | ${note}`;
+      } else {
+        newLine += `: ${note}`;
+      }
+    }
 
-    const lines = data.split('\n');
+    lines[taskIndex] = newLine;
+    await fs.writeFile(TASK_FILE, lines.join('\n'));
+
     const hasPending = lines.some(l => l.startsWith('- [ ] '));
     
     if (!hasPending) {
