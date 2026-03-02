@@ -12,7 +12,15 @@ export class TaskService {
 
   async initChecklist(tasks: string[], goal: string): Promise<number> {
     await this.ensureInit();
-    const content = `# Goal: ${goal}\n\n${tasks.map(t => `- [ ] ${t}`).join('\n')}`;
+    const sanitizedGoal = goal.replace(/[\r\n]+/g, ' ').trim();
+    const sanitizedTasks = tasks.map(original => {
+      let t = original.replace(/[\r\n]+/g, ' ').trim();
+      if (t.startsWith('- [ ] ')) {
+        t = t.replace(/^-\s*\[\s*\]\s*/, '').trim();
+      }
+      return t;
+    });
+    const content = `# Goal: ${sanitizedGoal}\n\n${sanitizedTasks.map(t => `- [ ] ${t}`).join('\n')}`;
     await fs.writeFile(TASK_FILE, content);
     return tasks.length;
   }
