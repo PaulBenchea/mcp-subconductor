@@ -59,13 +59,34 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
             text: success ? `Marked ${task} as completed.` : `Task ${task} not found or already completed.`
           }]
         };
-      } catch (err: any) {
+      }
+      catch (err: any) {
         return {
           content: [{ type: 'text', text: `Error: ${err.message}` }]
         };
       }
     }
   );
+
+  server.registerTool(
+    'unmark_task',
+    {
+      description: 'Revert a completed task back to pending status in the active checklist. You can reference the task by its ID (e.g., "1" or "#1") or by its full name. Any completion notes will be removed.',
+      inputSchema: {
+        task: z.string().describe('The task ID (e.g., "1") or task name to unmark')
+      }
+    },
+    async ({ task }) => {
+      const success = await taskService.unmarkTask(task);
+      return {
+        content: [{
+          type: 'text',
+          text: success ? `Reverted ${task} to pending status.` : `Completed task ${task} not found.`
+        }]
+      };
+    }
+  );
+
   if (!settings.disableBatch) {
     server.registerTool(
       'get_pending_tasks',
@@ -104,6 +125,30 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       async ({ tasks }) => {
         try {
           const results = await taskService.markTasksDone(tasks);
+          const summary = results.map(r => `${r.name}: ${r.success ? 'Success' : 'Failed'}`).join('\n');
+          return {
+            content: [{ type: 'text', text: summary }]
+          };
+        }
+        catch (err: any) {
+          return {
+            content: [{ type: 'text', text: err.message }]
+          };
+        }
+      }
+    );
+
+    server.registerTool(
+      'unmark_tasks',
+      {
+        description: 'Revert multiple completed tasks back to pending status in a single batch operation. You can reference tasks by their ID (e.g., "1" or "#1") or by their full name.',
+        inputSchema: {
+          tasks: z.array(z.string().describe('The task ID (e.g., "1") or task name')).describe('List of tasks to unmark')
+        }
+      },
+      async ({ tasks }) => {
+        try {
+          const results = await taskService.unmarkTasks(tasks);
           const summary = results.map(r => `${r.name}: ${r.success ? 'Success' : 'Failed'}`).join('\n');
           return {
             content: [{ type: 'text', text: summary }]
