@@ -7,6 +7,7 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
   server.registerTool(
     'init_checklist',
     {
+      description: 'Initialize a new task checklist for the current subconductor run. This tool creates a set of tasks to be completed toward a specific goal.',
       inputSchema: {
         tasks: z.array(z.string()).describe('List of tasks to perform.'),
         goal: z.string().describe('The overall goal of this subconductor run')
@@ -22,7 +23,9 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
 
   server.registerTool(
     'get_pending_task',
-    {},
+    {
+      description: 'Retrieve the next single pending task from the active checklist. Returns "DONE" if all tasks are finished.'
+    },
     async () => {
       try {
         const task = await taskService.getPendingTask();
@@ -41,6 +44,7 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
   server.registerTool(
     'mark_task_done',
     {
+      description: 'Mark a specific task as completed in the active checklist. You can optionally provide a note detailing the progress or result.',
       inputSchema: {
         task: z.string().describe('The task name to mark as completed'),
         note: z.string().optional().describe('An optional note to add or append to the task')
@@ -60,6 +64,7 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
     server.registerTool(
       'get_pending_tasks',
       {
+        description: 'Retrieve a batch of multiple pending tasks from the active checklist. This is useful for getting an overview of upcoming work or for efficiently processing multiple simple tasks in a single turn.',
         inputSchema: {
           count: z.number().int().min(1).max(50).optional().default(5).describe('The number of pending tasks to retrieve')
         }
@@ -82,6 +87,7 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
     server.registerTool(
       'mark_tasks_done',
       {
+        description: 'Mark multiple tasks as completed in a single batch operation. This is efficient when several tasks are finished simultaneously. Like mark_task_done, you can optionally provide a note for each task to document progress or results.',
         inputSchema: {
           tasks: z.array(z.object({
             name: z.string(),

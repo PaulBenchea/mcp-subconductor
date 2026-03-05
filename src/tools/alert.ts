@@ -12,6 +12,7 @@ export function registerAlertTools(server: McpServer, settings: McpSettings) {
   server.registerTool(
     'alert',
     {
+      description: 'Trigger a desktop notification with a custom title, message, and severity level (info, warn, error). This is useful for providing immediate feedback on background task completion or issues.',
       inputSchema: {
         title: z.string().describe('The title of the notification'),
         message: z.string().describe('The message body'),
