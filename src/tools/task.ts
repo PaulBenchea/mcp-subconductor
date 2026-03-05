@@ -24,7 +24,7 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
   server.registerTool(
     'get_pending_task',
     {
-      description: 'Retrieve the next single pending task from the active checklist. Returns "DONE" if all tasks are finished.'
+      description: 'Retrieve the next single pending task from the active checklist. Returns "DONE" if all tasks are finished. Tasks are returned with an ID (e.g., "(#1) Task Name") which can be used to reference them efficiently.'
     },
     async () => {
       try {
@@ -44,27 +44,33 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
   server.registerTool(
     'mark_task_done',
     {
-      description: 'Mark a specific task as completed in the active checklist. You can optionally provide a note detailing the progress or result.',
+      description: 'Mark a specific task as completed in the active checklist. You can reference the task by its ID (e.g., "1" or "#1") for efficiency, or by its full name. You can optionally provide a note detailing the progress or result.',
       inputSchema: {
-        task: z.string().describe('The task name to mark as completed'),
+        task: z.string().describe('The task ID (e.g., "1") or task name to mark as completed'),
         note: z.string().optional().describe('An optional note to add or append to the task')
       }
     },
     async ({ task, note }) => {
-      const success = await taskService.markTaskDone(task, note);
-      return {
-        content: [{
-          type: 'text',
-          text: success ? `Marked ${task} as completed.` : `Task ${task} not found or already completed.`
-        }]
-      };
+      try {
+        const success = await taskService.markTaskDone(task, note);
+        return {
+          content: [{
+            type: 'text',
+            text: success ? `Marked ${task} as completed.` : `Task ${task} not found or already completed.`
+          }]
+        };
+      } catch (err: any) {
+        return {
+          content: [{ type: 'text', text: `Error: ${err.message}` }]
+        };
+      }
     }
   );
   if (!settings.disableBatch) {
     server.registerTool(
       'get_pending_tasks',
       {
-        description: 'Retrieve a batch of multiple pending tasks from the active checklist. This is useful for getting an overview of upcoming work or for efficiently processing multiple simple tasks in a single turn.',
+        description: 'Retrieve a batch of multiple pending tasks from the active checklist. Tasks are returned with an ID (e.g., "(#1) Task Name") which can be used to reference them efficiently. This is useful for getting an overview of upcoming work or for efficiently processing multiple simple tasks in a single turn.',
         inputSchema: {
           count: z.number().int().min(1).max(50).optional().default(5).describe('The number of pending tasks to retrieve')
         }
@@ -87,10 +93,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
     server.registerTool(
       'mark_tasks_done',
       {
-        description: 'Mark multiple tasks as completed in a single batch operation. This is efficient when several tasks are finished simultaneously. Like mark_task_done, you can optionally provide a note for each task to document progress or results.',
+        description: 'Mark multiple tasks as completed in a single batch operation. You can reference tasks by their ID (e.g., "1" or "#1") or by their full name. This is efficient when several tasks are finished simultaneously. Like mark_task_done, you can optionally provide a note for each task to document progress or results.',
         inputSchema: {
           tasks: z.array(z.object({
-            name: z.string(),
+            name: z.string().describe('The task ID (e.g., "1") or task name'),
             note: z.string().optional()
           })).describe('List of tasks to mark as completed')
         }

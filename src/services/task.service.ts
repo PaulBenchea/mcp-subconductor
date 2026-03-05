@@ -13,12 +13,12 @@ export class TaskService {
   async initChecklist(tasks: string[], goal: string): Promise<number> {
     await this.ensureInit();
     const sanitizedGoal = goal.replace(/[\r\n]+/g, ' ').trim();
-    const sanitizedTasks = tasks.map(original => {
+    const sanitizedTasks = tasks.map((original, index) => {
       let t = original.replace(/[\r\n]+/g, ' ').trim();
       if (t.startsWith('- [ ] ')) {
-        t = t.replace(/^-\s*\[\s*\]\s*/, '').trim();
+        t = t.replace(/^-\s*\[\s*]\s*/, '').trim();
       }
-      return t;
+      return `(#${index + 1}) ${t}`;
     });
     const content = `# Goal: ${sanitizedGoal}\n\n${sanitizedTasks.map(t => `- [ ] ${t}`).join('\n')}`;
     await fs.writeFile(TASK_FILE, content);
@@ -66,14 +66,31 @@ export class TaskService {
     return results;
   }
 
-  async markTaskDone(taskName: string, note?: string): Promise<boolean> {
+  async markTaskDone(taskIdentifier: string, note?: string): Promise<boolean> {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
     const lines = data.split('\n');
     
-    const taskIndex = lines.findIndex(l =>
-      l.startsWith(`- [ ] ${taskName}`) && (l.length === (`- [ ] ${taskName}`).length
-        || l.startsWith(`- [ ] ${taskName}:`)));
+    const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
+    const isNumericId = /^\d+$/.test(cleanId);
+    
+    let taskIndex = -1;
+    if (isNumericId) {
+      const searchId = `(#${cleanId})`;
+      taskIndex = lines.findIndex(l => l.startsWith(`- [ ] ${searchId}`));
+    }
+    
+    if (taskIndex === -1) {
+      taskIndex = lines.findIndex(l => {
+        const trimmedLine = l.trim();
+        if (!trimmedLine.startsWith('- [ ] ')) return false;
+        const taskContent = trimmedLine.replace('- [ ] ', '').trim();
+        const nameWithoutId = taskContent.replace(/^\(#\d+\)\s+/, '').trim();
+        
+        return nameWithoutId === taskIdentifier || 
+               nameWithoutId.startsWith(taskIdentifier + ':');
+      });
+    }
     
     if (taskIndex === -1) {
       return false;
