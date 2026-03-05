@@ -4,41 +4,86 @@ import { AlertType } from '../models/enums.js';
 import { notificationService } from './notification.service.js';
 
 export class TaskService {
+  private readonly DEFAULT_COLUMNS = ['Status', 'ID', 'Name'];
+
   async ensureInit(): Promise<void> {
     try {
       await fs.mkdir(WORKING_DIR, { recursive: true });
     } catch (e) {}
   }
 
-  async initChecklist(tasks: string[], goal: string): Promise<number> {
+  async initChecklist(tasks: string[], goal: string, columns?: string[]): Promise<number> {
     await this.ensureInit();
     const sanitizedGoal = goal.replace(/[\r\n]+/g, ' ').trim();
-    const sanitizedTasks = tasks.map((original, index) => {
+    const cols = columns && columns.length > 0 ? [...columns] : [...this.DEFAULT_COLUMNS];
+    
+    if (!cols.some(c => c.toLowerCase() === 'status')) cols.unshift('Status');
+    if (!cols.some(c => c.toLowerCase() === 'id')) cols.splice(cols.findIndex(c => c.toLowerCase() === 'status') + 1, 0, 'ID');
+    if (!cols.some(c => c.toLowerCase() === 'name')) cols.splice(cols.findIndex(c => c.toLowerCase() === 'id') + 1, 0, 'Name');
+
+    const header = `| ${cols.join(' | ')} |`;
+    const separator = `| ${cols.map(() => ':---').join(' | ')} |`;
+    
+    const rows = tasks.map((original, index) => {
       let t = original.replace(/[\r\n]+/g, ' ').trim();
       if (t.startsWith('- [ ] ')) {
         t = t.replace(/^-\s*\[\s*]\s*/, '').trim();
       }
-      return `(#${index + 1}) ${t}`;
+      
+      const rowData: string[] = cols.map(col => {
+        const c = col.toLowerCase();
+        if (c === 'status') return '[ ]';
+        if (c === 'id') return `${index + 1}`;
+        if (c === 'name') return t;
+        return ''; // Custom columns are empty initially
+      });
+      
+      return `| ${rowData.join(' | ')} |`;
     });
-    const content = `# Goal: ${sanitizedGoal}\n\n${sanitizedTasks.map(t => `- [ ] ${t}`).join('\n')}`;
+
+    const content = `# Goal: ${sanitizedGoal}\n\n${header}\n${separator}\n${rows.join('\n')}`;
     await fs.writeFile(TASK_FILE, content);
     return tasks.length;
+  }
+
+  private parseTable(data: string): { columns: string[], rows: string[][] } {
+    const lines = data.split('\n').map(l => l.trim()).filter(l => l.startsWith('|'));
+    if (lines.length < 2) throw new Error('Invalid task table format.');
+
+    const columns = lines[0].split('|').map(c => c.trim()).filter(c => c !== '');
+    // Skip separator line at lines[1]
+    const rows = lines.slice(2).map(line => {
+      const cells = line.split('|').map(c => c.trim());
+      // Filter out the empty strings from the start and end due to leading/trailing pipes
+      return cells.slice(1, -1);
+    });
+
+    return { columns, rows };
+  }
+
+  private stringifyTable(columns: string[], rows: string[][]): string {
+    const header = `| ${columns.join(' | ')} |`;
+    const separator = `| ${columns.map(() => ':---').join(' | ')} |`;
+    const rowLines = rows.map(row => `| ${row.join(' | ')} |`);
+    return `${header}\n${separator}\n${rowLines.join('\n')}`;
   }
 
   async getPendingTask(): Promise<string | null> {
     await this.ensureInit();
     try {
       const data = await fs.readFile(TASK_FILE, 'utf-8');
-      const lines = data.split('\n');
-      const nextLine = lines.find(l => l.startsWith('- [ ] '));
+      const { columns, rows } = this.parseTable(data);
+      
+      const statusIdx = columns.findIndex(c => c.toLowerCase() === 'status');
+      const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
+      const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
 
-      if (!nextLine) {
-        return null;
-      }
+      const pendingRow = rows.find(row => row[statusIdx] === '[ ]');
+      if (!pendingRow) return null;
 
-      return nextLine.replace('- [ ] ', '').trim();
+      return `(#${pendingRow[idIdx]}) ${pendingRow[nameIdx]}`;
     } catch (err) {
-      throw new Error('No active checklist found. Run init_checklist first.');
+      throw new Error('No active checklist found or invalid format. Run init_checklist first.');
     }
   }
 
@@ -46,13 +91,18 @@ export class TaskService {
     await this.ensureInit();
     try {
       const data = await fs.readFile(TASK_FILE, 'utf-8');
-      const lines = data.split('\n');
-      return lines
-        .filter(l => l.startsWith('- [ ] '))
+      const { columns, rows } = this.parseTable(data);
+      
+      const statusIdx = columns.findIndex(c => c.toLowerCase() === 'status');
+      const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
+      const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
+
+      return rows
+        .filter(row => row[statusIdx] === '[ ]')
         .slice(0, count)
-        .map(l => l.replace('- [ ] ', '').trim());
+        .map(row => `(#${row[idIdx]}) ${row[nameIdx]}`);
     } catch (err) {
-      throw new Error('No active checklist found. Run init_checklist first.');
+      throw new Error('No active checklist found or invalid format. Run init_checklist first.');
     }
   }
 
@@ -76,60 +126,50 @@ export class TaskService {
     return results;
   }
 
-  private findTaskIndex(lines: string[], identifier: string, isDone: boolean): number {
-    const prefix = isDone ? '- [x] ' : '- [ ] ';
-    const cleanId = identifier.replace(/[()#]/g, '').trim();
-    const isNumericId = /^\d+$/.test(cleanId);
-    
-    let taskIndex = -1;
-    if (isNumericId) {
-      const searchId = `(#${cleanId})`;
-      taskIndex = lines.findIndex(l => l.trim().startsWith(`${prefix}${searchId}`));
-    }
-    
-    if (taskIndex === -1) {
-      taskIndex = lines.findIndex(l => {
-        const trimmedLine = l.trim();
-        if (!trimmedLine.startsWith(prefix)) return false;
-        const taskContent = trimmedLine.replace(prefix, '').trim();
-        
-        const nameWithoutId = taskContent.replace(/^\(#\d+\)\s+/, '').trim();
-        
-        return nameWithoutId === identifier || 
-               nameWithoutId.startsWith(identifier + ':');
-      });
-    }
-    return taskIndex;
-  }
-
   async markTaskDone(taskIdentifier: string, note?: string): Promise<boolean> {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
-    const lines = data.split('\n');
+    const sections = data.split('\n\n');
+    const goalSection = sections[0];
+    const tableData = sections.slice(1).join('\n\n');
     
-    const taskIndex = this.findTaskIndex(lines, taskIdentifier, false);
+    const { columns, rows } = this.parseTable(tableData);
     
-    if (taskIndex === -1) {
-      return false;
-    }
+    const statusIdx = columns.findIndex(c => c.toLowerCase() === 'status');
+    const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
+    const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
 
-    const currentLine = lines[taskIndex];
-    let newLine = currentLine.replace('- [ ] ', '- [x] ');
+    const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
+    const isNumericId = /^\d+$/.test(cleanId);
+
+    const taskRowIdx = rows.findIndex(row => {
+      if (row[statusIdx] !== '[ ]') return false;
+      
+      if (isNumericId && row[idIdx] === cleanId) return true;
+      if (row[nameIdx] === taskIdentifier) return true;
+      
+      return false;
+    });
+
+    if (taskRowIdx === -1) return false;
+
+    rows[taskRowIdx][statusIdx] = '[x]';
     
     if (note) {
-      if (newLine.includes(': ')) {
-        newLine += ` | ${note}`;
-      } else {
-        newLine += `: ${note}`;
+      let notesIdx = columns.findIndex(c => ['notes', 'details', 'note', 'detail'].includes(c.toLowerCase()));
+      if (notesIdx === -1) {
+        columns.push('Notes');
+        notesIdx = columns.length - 1;
+        rows.forEach(row => row.push(''));
       }
+      const currentNote = rows[taskRowIdx][notesIdx];
+      rows[taskRowIdx][notesIdx] = currentNote ? `${currentNote} | ${note}` : note;
     }
 
-    lines[taskIndex] = newLine;
-    await fs.writeFile(TASK_FILE, lines.join('\n'));
+    const newTable = this.stringifyTable(columns, rows);
+    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
 
-    const hasPending = lines.some(l => l.startsWith('- [ ] '));
-    
-    if (!hasPending) {
+    if (!rows.some(row => row[statusIdx] === '[ ]')) {
       await notificationService.alert('Checklist Complete', 'All tasks in your manifest are finished!', AlertType.Info);
     }
 
@@ -139,22 +179,38 @@ export class TaskService {
   async unmarkTask(taskIdentifier: string): Promise<boolean> {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
-    const lines = data.split('\n');
+    const sections = data.split('\n\n');
+    const goalSection = sections[0];
+    const tableData = sections.slice(1).join('\n\n');
     
-    const taskIndex = this.findTaskIndex(lines, taskIdentifier, true);
+    const { columns, rows } = this.parseTable(tableData);
     
-    if (taskIndex === -1) {
+    const statusIdx = columns.findIndex(c => c.toLowerCase() === 'status');
+    const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
+    const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
+    const notesIdx = columns.findIndex(c => ['notes', 'details', 'note', 'detail'].includes(c.toLowerCase()));
+
+    const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
+    const isNumericId = /^\d+$/.test(cleanId);
+
+    const taskRowIdx = rows.findIndex(row => {
+      if (row[statusIdx] !== '[x]') return false;
+      
+      if (isNumericId && row[idIdx] === cleanId) return true;
+      if (row[nameIdx] === taskIdentifier) return true;
+      
       return false;
+    });
+
+    if (taskRowIdx === -1) return false;
+
+    rows[taskRowIdx][statusIdx] = '[ ]';
+    if (notesIdx !== -1) {
+      rows[taskRowIdx][notesIdx] = '';
     }
 
-    const currentLine = lines[taskIndex];
-    let newLine = currentLine.replace('- [x] ', '- [ ] ');
-    if (newLine.includes(': ')) {
-      newLine = newLine.split(': ')[0];
-    }
-
-    lines[taskIndex] = newLine;
-    await fs.writeFile(TASK_FILE, lines.join('\n'));
+    const newTable = this.stringifyTable(columns, rows);
+    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
 
     return true;
   }

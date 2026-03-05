@@ -7,14 +7,15 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
   server.registerTool(
     'init_checklist',
     {
-      description: 'Initialize a new task checklist for the current subconductor run. This tool creates a set of tasks to be completed toward a specific goal.',
+      description: 'Initialize a new task checklist for the current subconductor run. This tool creates a task table with Status, ID, Name, and optional custom columns (like Notes).',
       inputSchema: {
         tasks: z.array(z.string()).describe('List of tasks to perform.'),
-        goal: z.string().describe('The overall goal of this subconductor run')
+        goal: z.string().describe('The overall goal of this subconductor run'),
+        columns: z.array(z.string()).optional().describe('Optional list of custom columns for the task table. "Status", "ID", and "Name" are always included.')
       }
     },
-    async ({ tasks, goal }) => {
-      const count = await taskService.initChecklist(tasks, goal);
+    async ({ tasks, goal, columns }) => {
+      const count = await taskService.initChecklist(tasks, goal, columns);
       return {
         content: [{ type: 'text', text: `Checklist created with ${count} tasks.` }]
       };
