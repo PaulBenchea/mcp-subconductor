@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-03-05
+
+### Added
+- **Table-Based Manifest**: Transitioned task storage from a simple list to a structured Markdown table, providing a more professional and readable audit trail.
+- **Custom Columns**: Added support for defining arbitrary custom columns during checklist initialization via the `init_checklist` tool.
+- **Dynamic Note Management**: Implemented dynamic addition of the `Notes` column only when a note is actually provided, keeping the initial manifest compact.
+- **Reversion Support**: Introduced `unmark_task` and `unmark_tasks` tools to allow reverting completed tasks back to a pending state with automatic note stripping.
+- **Task IDs**: Implemented a numeric task ID system for highly token-efficient task selection and completion.
+- **CLI Configuration**: Added command-line flags (`--disable-batch`, `--disable-alerts`) to customize server behavior at startup.
+
+### Changed
+- **Tool Descriptions**: Enhanced descriptions for all MCP tools to provide better guidance for LLM agents during tool analysis.
+- **Robust Matching**: Refactored task identification logic to be case-insensitive and resilient to dynamic structural changes in the manifest table.
+
 ## [1.0.4] - 2026-03-02
 
 ### Added

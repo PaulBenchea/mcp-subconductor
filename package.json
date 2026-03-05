@@ -1,8 +1,8 @@
 {
   "name": "@psno/subconductor",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "license": "Apache-2.0",
-  "description": "Subconductor is an MCP server that acts as a Persistent State Machine for AI agents. It prevents 'context drift' by externalizing the task list into a manifest, supporting batch operations, task notes, and non-linear execution for a transparent, resumable audit trail.",
+  "description": "Subconductor is an MCP server that acts as a Persistent State Machine for AI agents. It prevents 'context drift' by externalizing the task list into a Markdown table manifest, supporting batch operations, dynamic custom columns, task IDs, and non-linear execution for a transparent, resumable audit trail.",
   "author": "Paul Benchea",
   "publishConfig": {
     "access": "public"
