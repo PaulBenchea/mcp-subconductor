@@ -11,14 +11,19 @@ import { AlertType } from './models/enums.js';
 import { notificationService } from './services/notification.service.js';
 import { registerAlertTools } from './tools/alert.js';
 import { registerTaskTools } from './tools/task.js';
+import { getSettings } from './config/settings.js';
+
+const settings = getSettings();
+
+notificationService.configure(settings);
 
 const server = new McpServer({
   name: APP_NAME,
   version: APP_VERSION,
 });
 
-registerTaskTools(server);
-registerAlertTools(server);
+registerTaskTools(server, settings);
+registerAlertTools(server, settings);
 
 async function main() {
   const transport = new StdioServerTransport();

@@ -1,8 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import type { McpSettings } from '../models/interfaces.js';
 import { taskService } from '../services/task.service.js';
 
-export function registerTaskTools(server: McpServer) {
+export function registerTaskTools(server: McpServer, settings: McpSettings) {
   server.registerTool(
     'init_checklist',
     {
@@ -38,28 +39,6 @@ export function registerTaskTools(server: McpServer) {
   );
 
   server.registerTool(
-    'get_pending_tasks',
-    {
-      inputSchema: {
-        count: z.number().int().min(1).max(50).optional().default(5).describe('The number of pending tasks to retrieve')
-      }
-    },
-    async ({ count }) => {
-      try {
-        const tasks = await taskService.getPendingTasks(count);
-        return {
-          content: [{ type: 'text', text: tasks.length > 0 ? tasks.join('\n') : 'DONE' }]
-        };
-      }
-      catch (err: any) {
-        return {
-          content: [{ type: 'text', text: err.message }]
-        };
-      }
-    }
-  );
-
-  server.registerTool(
     'mark_task_done',
     {
       inputSchema: {
@@ -77,30 +56,54 @@ export function registerTaskTools(server: McpServer) {
       };
     }
   );
+  if (!settings.disableBatch) {
+    server.registerTool(
+      'get_pending_tasks',
+      {
+        inputSchema: {
+          count: z.number().int().min(1).max(50).optional().default(5).describe('The number of pending tasks to retrieve')
+        }
+      },
+      async ({ count }) => {
+        try {
+          const tasks = await taskService.getPendingTasks(count);
+          return {
+            content: [{ type: 'text', text: tasks.length > 0 ? tasks.join('\n') : 'DONE' }]
+          };
+        }
+        catch (err: any) {
+          return {
+            content: [{ type: 'text', text: err.message }]
+          };
+        }
+      }
+    );
 
-  server.registerTool(
-    'mark_tasks_done',
-    {
-      inputSchema: {
-        tasks: z.array(z.object({
-          name: z.string(),
-          note: z.string().optional()
-        })).describe('List of tasks to mark as completed')
+    server.registerTool(
+      'mark_tasks_done',
+      {
+        inputSchema: {
+          tasks: z.array(z.object({
+            name: z.string(),
+            note: z.string().optional()
+          })).describe('List of tasks to mark as completed')
+        }
+      },
+      async ({ tasks }) => {
+        try {
+          const results = await taskService.markTasksDone(tasks);
+          const summary = results.map(r => `${r.name}: ${r.success ? 'Success' : 'Failed'}`).join('\n');
+          return {
+            content: [{ type: 'text', text: summary }]
+          };
+        }
+        catch (err: any) {
+          return {
+            content: [{ type: 'text', text: err.message }]
+          };
+        }
       }
-    },
-    async ({ tasks }) => {
-      try {
-        const results = await taskService.markTasksDone(tasks);
-        const summary = results.map(r => `${r.name}: ${r.success ? 'Success' : 'Failed'}`).join('\n');
-        return {
-          content: [{ type: 'text', text: summary }]
-        };
-      }
-      catch (err: any) {
-        return {
-          content: [{ type: 'text', text: err.message }]
-        };
-      }
-    }
-  );
+    );
+  }
+
 }
