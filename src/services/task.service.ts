@@ -66,31 +66,48 @@ export class TaskService {
     return results;
   }
 
-  async markTaskDone(taskIdentifier: string, note?: string): Promise<boolean> {
+  async unmarkTasks(tasks: string[]): Promise<{ name: string, success: boolean }[]> {
     await this.ensureInit();
-    let data = await fs.readFile(TASK_FILE, 'utf-8');
-    const lines = data.split('\n');
-    
-    const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
+    const results = [];
+    for (const t of tasks) {
+      const success = await this.unmarkTask(t);
+      results.push({ name: t, success });
+    }
+    return results;
+  }
+
+  private findTaskIndex(lines: string[], identifier: string, isDone: boolean): number {
+    const prefix = isDone ? '- [x] ' : '- [ ] ';
+    const cleanId = identifier.replace(/[()#]/g, '').trim();
     const isNumericId = /^\d+$/.test(cleanId);
     
     let taskIndex = -1;
     if (isNumericId) {
       const searchId = `(#${cleanId})`;
-      taskIndex = lines.findIndex(l => l.startsWith(`- [ ] ${searchId}`));
+      taskIndex = lines.findIndex(l => l.trim().startsWith(`${prefix}${searchId}`));
     }
     
     if (taskIndex === -1) {
       taskIndex = lines.findIndex(l => {
         const trimmedLine = l.trim();
-        if (!trimmedLine.startsWith('- [ ] ')) return false;
-        const taskContent = trimmedLine.replace('- [ ] ', '').trim();
+        if (!trimmedLine.startsWith(prefix)) return false;
+        const taskContent = trimmedLine.replace(prefix, '').trim();
+        
         const nameWithoutId = taskContent.replace(/^\(#\d+\)\s+/, '').trim();
         
-        return nameWithoutId === taskIdentifier || 
-               nameWithoutId.startsWith(taskIdentifier + ':');
+        return nameWithoutId === identifier || 
+               nameWithoutId.startsWith(identifier + ':');
       });
     }
+    return taskIndex;
+  }
+
+  async markTaskDone(taskIdentifier: string, note?: string): Promise<boolean> {
+    await this.ensureInit();
+    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const lines = data.split('\n');
+    
+    const taskIndex = this.findTaskIndex(lines, taskIdentifier, false);
     
     if (taskIndex === -1) {
       return false;
@@ -115,6 +132,29 @@ export class TaskService {
     if (!hasPending) {
       await notificationService.alert('Checklist Complete', 'All tasks in your manifest are finished!', AlertType.Info);
     }
+
+    return true;
+  }
+
+  async unmarkTask(taskIdentifier: string): Promise<boolean> {
+    await this.ensureInit();
+    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const lines = data.split('\n');
+    
+    const taskIndex = this.findTaskIndex(lines, taskIdentifier, true);
+    
+    if (taskIndex === -1) {
+      return false;
+    }
+
+    const currentLine = lines[taskIndex];
+    let newLine = currentLine.replace('- [x] ', '- [ ] ');
+    if (newLine.includes(': ')) {
+      newLine = newLine.split(': ')[0];
+    }
+
+    lines[taskIndex] = newLine;
+    await fs.writeFile(TASK_FILE, lines.join('\n'));
 
     return true;
   }
