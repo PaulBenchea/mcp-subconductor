@@ -89,7 +89,7 @@ export class TaskService {
       const rowData: string[] = headers.map(column => {
         const columnLower = column.toLowerCase();
         if (columnLower === TaskColumn.Status.toLowerCase()) {
-          return TaskStatus.Idle;
+          return TaskStatus.Pending;
         }
         if (columnLower === TaskColumn.ID.toLowerCase()) {
           return `${index + 1}`;
@@ -157,7 +157,6 @@ export class TaskService {
 
     if (targetIndex === -1 || !targetPath) return false;
 
-    // The current path could be './checklists/slug/checklist.md'
     const fullSourceDir = path.dirname(path.join(WORKING_DIR, targetPath));
     const folderName = path.basename(fullSourceDir);
     const fullTargetDir = path.join(ARCHIVE_DIR, folderName);
@@ -165,7 +164,6 @@ export class TaskService {
     try {
       await fs.rename(fullSourceDir, fullTargetDir);
     } catch (error) {
-      // If it fails to move (e.g. across drives, though unlikely here), try to continue or throw
       throw new Error(`Failed to move checklist folder to archive: ${error}`);
     }
 
@@ -182,9 +180,6 @@ export class TaskService {
     }
 
     await fs.writeFile(CHECKLISTS_INDEX_FILE, updatedLines.join('\n'));
-    
-    // We should also sync the header in the moved file to update its internal path logic if needed, 
-    // though the inner file doesn't currently store its own relative path. Just syncing to update file modified date.
     await this.syncProgress(path.join(fullTargetDir, 'checklist.md'));
 
     return true;
@@ -265,7 +260,7 @@ export class TaskService {
       const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
       const nameIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Name.toLowerCase());
 
-      const pendingRow = rows.find(row => row[statusIndex] === TaskStatus.Idle);
+      const pendingRow = rows.find(row => row[statusIndex] === TaskStatus.Pending);
       if (!pendingRow) {
         return null;
       }
@@ -288,7 +283,7 @@ export class TaskService {
       const nameIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Name.toLowerCase());
 
       return rows
-        .filter(row => row[statusIndex] === TaskStatus.Idle)
+        .filter(row => row[statusIndex] === TaskStatus.Pending)
         .slice(0, count)
         .map(row => `(#${row[idIndex]}) ${row[nameIndex]}`);
     }
@@ -335,7 +330,7 @@ export class TaskService {
     const isNumericId = /^\d+$/.test(cleanId);
 
     const taskRowIndex = rows.findIndex(row => {
-      if (row[statusIndex] !== TaskStatus.Idle) {
+      if (row[statusIndex] !== TaskStatus.Pending) {
         return false;
       }
       if (isNumericId && row[idIndex] === cleanId) {
@@ -407,7 +402,7 @@ export class TaskService {
       return false;
     }
 
-    rows[taskRowIndex][statusIndex] = TaskStatus.Idle;
+    rows[taskRowIndex][statusIndex] = TaskStatus.Pending;
     if (notesIndex !== -1) {
       rows[taskRowIndex][notesIndex] = '';
     }
@@ -444,7 +439,7 @@ export class TaskService {
     const rowData: string[] = columns.map(column => {
       const columnLower = column.toLowerCase();
       if (columnLower === TaskColumn.Status.toLowerCase()) {
-        return TaskStatus.Idle;
+        return TaskStatus.Pending;
       }
       if (columnLower === TaskColumn.ID.toLowerCase()) {
         return newId;
@@ -538,7 +533,7 @@ export class TaskService {
       const rowData: string[] = columns.map(column => {
         const columnLower = column.toLowerCase();
         if (columnLower === TaskColumn.Status.toLowerCase()) {
-          return TaskStatus.Idle;
+          return TaskStatus.Pending;
         }
         if (columnLower === TaskColumn.ID.toLowerCase()) {
           return newId;
@@ -650,13 +645,13 @@ export class TaskService {
       indexData = '';
     }
 
-    // Force index to setup table if missing ID column
     if (!indexData.includes('| Status | ID | Progress | Goal | Path |')) {
        indexData = '# Subconductor Checklists\n\n| Status | ID | Progress | Goal | Path |\n| :--- | :--- | :--- | :--- | :--- |';
     }
 
     const lines = indexData.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    const relativePath = `./checklists/${shortName}/checklist.md`;
+    const basePath = status === ChecklistStatus.Archived ? './archive/checklists' : './checklists';
+    const relativePath = `${basePath}/${shortName}/checklist.md`;
     const progress = `[${resolved}/${total}]`;
     const statusText = status;
     
@@ -730,7 +725,7 @@ export class TaskService {
 
       if (statusIndex !== -1 && cells[statusIndex]) {
         if (cells[statusIndex] === '[ ]') {
-          cells[statusIndex] = TaskStatus.Idle;
+          cells[statusIndex] = TaskStatus.Pending;
         }
         if (cells[statusIndex] === '[x]') {
           cells[statusIndex] = TaskStatus.Done;
