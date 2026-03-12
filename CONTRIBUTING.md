@@ -10,7 +10,8 @@ The following is a set of guidelines for contributing to this project. These are
 3. [Local Development](#local-development)
 4. [Coding Standards](#coding-standards)
 5. [Commit Message Convention](#commit-message-convention)
-6. [Pull Requests](#pull-requests)
+6. [LLM / AI Contributions](#llm--ai-contributions)
+7. [Pull Requests](#pull-requests)
 
 ## Reporting Bugs
 Bugs are tracked as GitHub issues. When creating an issue, please provide:
@@ -79,6 +80,11 @@ We use a strict commit message format to keep the Git history clean and readable
 * `[services] Implement monotonic task IDs`
 * `[docs] Add CONTRIBUTING.md file`
 * `[models][enums] Add ChecklistStatus enum`
+
+## LLM / AI Contributions
+If you are using an AI coding assistant (such as Windsurf, Cursor, or Gemini CLI) to help you contribute to this repository, please direct the AI to read the `.clirules.md` file located in the root of the project. 
+
+This file contains specific architectural and formatting constraints (like banning `node -e` script editing and strictly enforcing variable naming) that the AI must follow to ensure its output meets our repository's standards.
 
 ## Pull Requests
 1. Fork the repo and create your branch from `main`.
