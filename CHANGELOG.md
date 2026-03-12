@@ -6,12 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **Multiple Checklists**: Transitioned storage mechanism to support multiple independent checklists organized within a `.subconductor/checklists` directory.
-- **Checklists Index**: Introduced a central `.subconductor/checklists.md` index file tracking active, pending, and completed checklists.
-- **Dynamic Task Management**: Introduced `add_task`, `add_tasks`, `remove_task`, and `remove_tasks` tools for runtime additions and safe re-indexed deletions from active checklists.
-- **Initial Notes Support**: Task initialization now natively supports inputting tasks as objects with pre-populated `note` values.
-- **Goal Progress Tracking**: Integrated visual progress tracking (`[resolved/total]`) directly in the header of the active checklist file.
+- **Checklists Index**: Introduced a central `.subconductor/checklists.md` index file tracking active, idle, and completed checklists.
+- **Checklist Activation**: Introduced the `activate_checklist` tool allowing explicit switching between tracked checklists using their numeric index ID or goal name.
+- **Dynamic Task Management**: Introduced `add_task`, `add_tasks`, `remove_task`, and `remove_tasks` tools for runtime modifications of active checklists.
+- **Initial Notes Support**: Task initialization natively supports inputting tasks as objects with pre-populated `note` values.
+- **Goal Progress Tracking**: Integrated visual progress tracking (`[resolved/total]`) directly in the header of the active checklist file and the central index.
+- **Immutable Monotonic IDs**: Task and checklist IDs now monotonically increment and remain strictly immutable after deletions, drastically reducing context-drift during batch operations.
+- **Auto-Migration**: Built-in backward compatibility transparently parses, auto-migrates, and structurally aligns any legacy `tasks.md` format directly into the modern `1.2.0` multi-checklist directory upon its first access.
 
 ### Changed
+- **Enum-based Status Tracking**: Deprecated textual bracket strings (`[ ]`, `[x]`) in favor of strongly-typed `Idle` and `Done` text tracking inside Markdown tables.
 - **Codebase Standardization**: Systematically refactored the core library to remove all ambiguous variable abbreviations, improving strict typing, enum-based configuration, and maintainability.
 
 ## [1.1.0] - 2026-03-05
