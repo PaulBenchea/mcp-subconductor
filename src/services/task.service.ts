@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
-import { TASK_FILE, WORKING_DIR } from '../models/constants.js';
+import path from 'path';
+import { TASK_FILE, WORKING_DIR, CHECKLISTS_DIR, CHECKLISTS_INDEX_FILE } from '../models/constants.js';
 import { AlertType, TaskColumn } from '../models/enums.js';
 import { notificationService } from './notification.service.js';
 import type { TaskInput } from '../models/interfaces.js';
@@ -8,14 +9,75 @@ export class TaskService {
   private readonly DEFAULT_COLUMNS = [TaskColumn.Status, TaskColumn.ID, TaskColumn.Name];
 
   async ensureInit(): Promise<void> {
+    try { await fs.mkdir(WORKING_DIR, { recursive: true }); } catch (error) {}
+    try { await fs.mkdir(CHECKLISTS_DIR, { recursive: true }); } catch (error) {}
     try {
-      await fs.mkdir(WORKING_DIR, { recursive: true });
+      await fs.access(CHECKLISTS_INDEX_FILE);
+    } catch (error) {
+      await fs.writeFile(CHECKLISTS_INDEX_FILE, '# Subconductor Checklists\n\n');
+    }
+  }
+
+  private async getActiveChecklistPath(): Promise<string> {
+    await this.ensureInit();
+    try {
+      const indexData = await fs.readFile(CHECKLISTS_INDEX_FILE, 'utf-8');
+      const lines = indexData.split('\n');
+      for (const line of lines) {
+        if (line.includes('[Active]')) {
+          const match = line.match(/\((.*?)\)/);
+          if (match) {
+            return path.join(WORKING_DIR, match[1]);
+          }
+        }
+      }
     } catch (error) {}
+    
+    try {
+      await fs.access(TASK_FILE);
+      return TASK_FILE;
+    } catch (error) {
+      throw new Error('No active checklist found or invalid format. Run init_checklist first.');
+    }
+  }
+
+  private async updateChecklistsIndex(shortName: string, goal: string, resolved: number, total: number, status: 'Active' | 'Pending' | 'Done'): Promise<void> {
+    let indexData = '';
+    try {
+      indexData = await fs.readFile(CHECKLISTS_INDEX_FILE, 'utf-8');
+    } catch (error) {
+      indexData = '# Subconductor Checklists\n\n';
+    }
+
+    const lines = indexData.split('\n');
+    const relativePath = `./checklists/${shortName}/checklist.md`;
+    const newEntry = `- [${status === 'Done' ? 'x' : ' '}] [${status}] [${resolved}/${total}] ${goal} (${relativePath})`;
+
+    let found = false;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(`(${relativePath})`)) {
+        lines[i] = newEntry;
+        found = true;
+      } else if (status === 'Active' && lines[i].includes('[Active]')) {
+        lines[i] = lines[i].replace('[Active]', '[Pending]');
+      }
+    }
+
+    if (!found) {
+      lines.push(newEntry);
+    }
+
+    await fs.writeFile(CHECKLISTS_INDEX_FILE, lines.join('\n'));
   }
 
   async initChecklist(tasks: TaskInput[], goal: string, columns?: string[]): Promise<number> {
     await this.ensureInit();
     const sanitizedGoal = goal.replace(/[\r\n]+/g, ' ').trim();
+    const shortName = sanitizedGoal.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 20).replace(/^-|-$/g, '') || 'default';
+    const checklistDir = path.join(CHECKLISTS_DIR, shortName);
+    await fs.mkdir(checklistDir, { recursive: true });
+    const checklistPath = path.join(checklistDir, 'checklist.md');
+
     const headers = columns && columns.length > 0 ? [...columns] : [...this.DEFAULT_COLUMNS];
     
     if (!headers.some(column => column.toLowerCase() === TaskColumn.Status.toLowerCase())) {
@@ -58,7 +120,10 @@ export class TaskService {
     });
 
     const content = `# Goal: [0/${tasks.length}] ${sanitizedGoal}\n\n${markdownHeader}\n${separator}\n${rows.join('\n')}`;
-    await fs.writeFile(TASK_FILE, content);
+    await fs.writeFile(checklistPath, content);
+    
+    await this.updateChecklistsIndex(shortName, sanitizedGoal, 0, tasks.length, 'Active');
+
     return tasks.length;
   }
 
@@ -86,10 +151,38 @@ export class TaskService {
     return goalSection.replace(/# Goal: (\[\d+\/\d+\] )?/, `# Goal: [${resolved}/${total}] `);
   }
 
+  private async syncProgress(filePath: string): Promise<boolean> {
+    const data = await fs.readFile(filePath, 'utf-8');
+    const sections = data.split('\n\n');
+    let goalSection = sections[0];
+    const tableData = sections.slice(1).join('\n\n');
+    const { columns, rows } = this.parseTable(tableData);
+    
+    const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const total = rows.length;
+    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
+    const isDone = total > 0 && resolved === total;
+    
+    goalSection = this.updateGoalHeader(goalSection, resolved, total);
+    const newTable = this.stringifyTable(columns, rows);
+    await fs.writeFile(filePath, `${goalSection}\n\n${newTable}`);
+
+    const goalMatch = goalSection.match(/# Goal: \[\d+\/\d+\] (.*)/);
+    const goal = goalMatch ? goalMatch[1].trim() : 'Unknown Goal';
+    
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const match = normalizedPath.match(/checklists\/([^\/]+)\/checklist\.md/);
+    if (match) {
+      await this.updateChecklistsIndex(match[1], goal, resolved, total, isDone ? 'Done' : 'Active');
+    }
+    
+    return isDone;
+  }
+
   async getPendingTask(): Promise<string | null> {
-    await this.ensureInit();
+    const activePath = await this.getActiveChecklistPath();
     try {
-      const data = await fs.readFile(TASK_FILE, 'utf-8');
+      const data = await fs.readFile(activePath, 'utf-8');
       const { columns, rows } = this.parseTable(data);
       
       const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
@@ -106,9 +199,9 @@ export class TaskService {
   }
 
   async getPendingTasks(count: number = 5): Promise<string[]> {
-    await this.ensureInit();
+    const activePath = await this.getActiveChecklistPath();
     try {
-      const data = await fs.readFile(TASK_FILE, 'utf-8');
+      const data = await fs.readFile(activePath, 'utf-8');
       const { columns, rows } = this.parseTable(data);
       
       const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
@@ -125,7 +218,6 @@ export class TaskService {
   }
 
   async markTasksDone(tasks: { name: string, note?: string }[]): Promise<{ name: string, success: boolean }[]> {
-    await this.ensureInit();
     const results = [];
     for (const task of tasks) {
       const success = await this.markTaskDone(task.name, task.note);
@@ -135,7 +227,6 @@ export class TaskService {
   }
 
   async unmarkTasks(tasks: string[]): Promise<{ name: string, success: boolean }[]> {
-    await this.ensureInit();
     const results = [];
     for (const task of tasks) {
       const success = await this.unmarkTask(task);
@@ -145,8 +236,8 @@ export class TaskService {
   }
 
   async markTaskDone(taskIdentifier: string, note?: string): Promise<boolean> {
-    await this.ensureInit();
-    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const activePath = await this.getActiveChecklistPath();
+    let data = await fs.readFile(activePath, 'utf-8');
     const sections = data.split('\n\n');
     let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
@@ -182,13 +273,11 @@ export class TaskService {
       rows[taskRowIndex][notesIndex] = currentNote ? `${currentNote} | ${note}` : note;
     }
 
-    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
-    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
-
     const newTable = this.stringifyTable(columns, rows);
-    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
+    await fs.writeFile(activePath, `${goalSection}\n\n${newTable}`);
 
-    if (!rows.some(row => row[statusIndex] === '[ ]')) {
+    const isDone = await this.syncProgress(activePath);
+    if (isDone) {
       await notificationService.alert('Checklist Complete', 'All tasks in your manifest are finished!', AlertType.Info);
     }
 
@@ -196,8 +285,8 @@ export class TaskService {
   }
 
   async unmarkTask(taskIdentifier: string): Promise<boolean> {
-    await this.ensureInit();
-    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const activePath = await this.getActiveChecklistPath();
+    let data = await fs.readFile(activePath, 'utf-8');
     const sections = data.split('\n\n');
     let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
@@ -226,18 +315,17 @@ export class TaskService {
       rows[taskRowIndex][notesIndex] = '';
     }
 
-    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
-    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
-
     const newTable = this.stringifyTable(columns, rows);
-    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
+    await fs.writeFile(activePath, `${goalSection}\n\n${newTable}`);
+    
+    await this.syncProgress(activePath);
 
     return true;
   }
 
   async addTask(taskName: string, note?: string): Promise<string> {
-    await this.ensureInit();
-    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const activePath = await this.getActiveChecklistPath();
+    let data = await fs.readFile(activePath, 'utf-8');
     const sections = data.split('\n\n');
     let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
@@ -256,19 +344,17 @@ export class TaskService {
     
     rows.push(rowData);
 
-    const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
-    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
-    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
-
     const newTable = this.stringifyTable(columns, rows);
-    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
+    await fs.writeFile(activePath, `${goalSection}\n\n${newTable}`);
+    
+    await this.syncProgress(activePath);
     
     return `(#${newId}) ${taskName}`;
   }
 
   async removeTask(taskIdentifier: string): Promise<boolean> {
-    await this.ensureInit();
-    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const activePath = await this.getActiveChecklistPath();
+    let data = await fs.readFile(activePath, 'utf-8');
     const sections = data.split('\n\n');
     let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
@@ -296,18 +382,17 @@ export class TaskService {
       row[idIndex] = (index + 1).toString();
     });
 
-    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
-    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
-
     const newTable = this.stringifyTable(columns, rows);
-    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
+    await fs.writeFile(activePath, `${goalSection}\n\n${newTable}`);
+    
+    await this.syncProgress(activePath);
     
     return true;
   }
 
   async addTasks(tasks: { name: string, note?: string }[]): Promise<{ name: string, id: string }[]> {
-    await this.ensureInit();
-    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const activePath = await this.getActiveChecklistPath();
+    let data = await fs.readFile(activePath, 'utf-8');
     const sections = data.split('\n\n');
     let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
@@ -329,26 +414,23 @@ export class TaskService {
       results.push({ name: task.name, id: newId });
     }
 
-    const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
-    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
-    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
-
     const newTable = this.stringifyTable(columns, rows);
-    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
+    await fs.writeFile(activePath, `${goalSection}\n\n${newTable}`);
+    
+    await this.syncProgress(activePath);
     
     return results;
   }
 
   async removeTasks(tasks: string[]): Promise<{ name: string, success: boolean }[]> {
-    await this.ensureInit();
-    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const activePath = await this.getActiveChecklistPath();
+    let data = await fs.readFile(activePath, 'utf-8');
     const sections = data.split('\n\n');
     let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
     
     const { columns, rows } = this.parseTable(tableData);
     
-    const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
     const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
     
     const results: { name: string, success: boolean }[] = [];
@@ -376,11 +458,10 @@ export class TaskService {
       row[idIndex] = (index + 1).toString();
     });
 
-    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
-    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
-
     const newTable = this.stringifyTable(columns, rows);
-    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
+    await fs.writeFile(activePath, `${goalSection}\n\n${newTable}`);
+    
+    await this.syncProgress(activePath);
     
     return results;
   }
