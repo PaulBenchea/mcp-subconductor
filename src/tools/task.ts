@@ -9,7 +9,12 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
     {
       description: 'Initialize a new task checklist for the current subconductor run. This tool creates a task table with Status, ID, Name, and optional custom columns (like Notes).',
       inputSchema: {
-        tasks: z.array(z.string()).describe('List of tasks to perform.'),
+        tasks: z.array(
+          z.object({
+            name: z.string(),
+            note: z.string().optional()
+          })
+        ).describe('List of task objects with "name" and optional "note".').describe('List of tasks to perform. Must be objects with "name" and optional "note".'),
         goal: z.string().describe('The overall goal of this subconductor run'),
         columns: z.array(z.string()).optional().describe('Optional list of custom columns for the task table. "Status", "ID", and "Name" are always included.')
       }
@@ -88,6 +93,52 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
     }
   );
 
+  server.registerTool(
+    'add_task',
+    {
+      description: 'Add a new task to the active checklist.',
+      inputSchema: {
+        name: z.string().describe('The name of the task to add'),
+        note: z.string().optional().describe('An optional note for the task')
+      }
+    },
+    async ({ name, note }) => {
+      try {
+        const result = await taskService.addTask(name, note);
+        return {
+          content: [{ type: 'text', text: `Added task: ${result}` }]
+        };
+      }
+      catch (err: any) {
+        return { content: [{ type: 'text', text: `Error: ${err.message}` }] };
+      }
+    }
+  );
+
+  server.registerTool(
+    'remove_task',
+    {
+      description: 'Remove a task from the active checklist.',
+      inputSchema: {
+        task: z.string().describe('The task ID (e.g., "1") or task name to remove')
+      }
+    },
+    async ({ task }) => {
+      try {
+        const success = await taskService.removeTask(task);
+        return {
+          content: [{
+            type: 'text',
+            text: success ? `Removed task ${task}.` : `Task ${task} not found.`
+          }]
+        };
+      }
+      catch (err: any) {
+        return { content: [{ type: 'text', text: `Error: ${err.message}` }] };
+      }
+    }
+  );
+
   if (!settings.disableBatch) {
     server.registerTool(
       'get_pending_tasks',
@@ -162,6 +213,48 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
         }
       }
     );
-  }
 
+    server.registerTool(
+      'add_tasks',
+      {
+        description: 'Add multiple new tasks to the active checklist.',
+        inputSchema: {
+          tasks: z.array(z.object({
+            name: z.string().describe('The name of the task to add'),
+            note: z.string().optional().describe('An optional note for the task')
+          })).describe('List of tasks to add')
+        }
+      },
+      async ({ tasks }) => {
+        try {
+          const results = await taskService.addTasks(tasks);
+          const summary = results.map(r => `Added task: (#${r.id}) ${r.name}`).join('\n');
+          return { content: [{ type: 'text', text: summary }] };
+        }
+        catch (err: any) {
+          return { content: [{ type: 'text', text: `Error: ${err.message}` }] };
+        }
+      }
+    );
+
+    server.registerTool(
+      'remove_tasks',
+      {
+        description: 'Remove multiple tasks from the active checklist.',
+        inputSchema: {
+          tasks: z.array(z.string().describe('The task ID (e.g., "1") or task name to remove')).describe('List of tasks to remove')
+        }
+      },
+      async ({ tasks }) => {
+        try {
+          const results = await taskService.removeTasks(tasks);
+          const summary = results.map(r => `${r.name}: ${r.success ? 'Removed' : 'Not found'}`).join('\n');
+          return { content: [{ type: 'text', text: summary }] };
+        }
+        catch (err: any) {
+          return { content: [{ type: 'text', text: `Error: ${err.message}` }] };
+        }
+      }
+    );
+  }
 }
