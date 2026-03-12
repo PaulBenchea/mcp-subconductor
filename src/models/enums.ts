@@ -19,6 +19,6 @@ export enum ChecklistStatus {
 }
 
 export enum TaskStatus {
-  Idle = 'Idle',
+  Pending = 'Pending',
   Done = 'Done'
 }
