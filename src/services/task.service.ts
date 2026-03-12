@@ -46,28 +46,38 @@ export class TaskService {
     try {
       indexData = await fs.readFile(CHECKLISTS_INDEX_FILE, 'utf-8');
     } catch (error) {
-      indexData = '# Subconductor Checklists\n\n';
+      indexData = '# Subconductor Checklists\n\n| Status | Progress | Goal | Path |\n| :--- | :--- | :--- | :--- |';
     }
 
     const lines = indexData.split('\n');
+    const headerLines = lines.slice(0, 4); // Keep the "# Subconductor Checklists\n\n| Status | Progress | Goal | Path |\n| :--- | :--- | :--- | :--- |"
+    let tableLines = lines.slice(4);
+    
+    // In case the file existed but was using the old list format, reset it to table format
+    if (!indexData.includes('| Status |')) {
+        indexData = '# Subconductor Checklists\n\n| Status | Progress | Goal | Path |\n| :--- | :--- | :--- | :--- |';
+        tableLines = [];
+    }
+
     const relativePath = `./checklists/${shortName}/checklist.md`;
-    const newEntry = `- [${status === 'Done' ? 'x' : ' '}] [${status}] [${resolved}/${total}] ${goal} (${relativePath})`;
+    const progress = `[${resolved}/${total}]`;
+    const newEntry = `| ${status === 'Done' ? '[x]' : '[ ]'} ${status} | ${progress} | ${goal} | [Link](${relativePath}) |`;
 
     let found = false;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes(`(${relativePath})`)) {
-        lines[i] = newEntry;
+    for (let i = 0; i < tableLines.length; i++) {
+      if (tableLines[i].includes(`(${relativePath})`)) {
+        tableLines[i] = newEntry;
         found = true;
-      } else if (status === 'Active' && lines[i].includes('[Active]')) {
-        lines[i] = lines[i].replace('[Active]', '[Pending]');
+      } else if (status === 'Active' && tableLines[i].includes('Active')) {
+        tableLines[i] = tableLines[i].replace('Active', 'Pending');
       }
     }
 
     if (!found) {
-      lines.push(newEntry);
+      tableLines.push(newEntry);
     }
 
-    await fs.writeFile(CHECKLISTS_INDEX_FILE, lines.join('\n'));
+    await fs.writeFile(CHECKLISTS_INDEX_FILE, `${headerLines.join('\n')}\n${tableLines.join('\n')}`);
   }
 
   async initChecklist(tasks: TaskInput[], goal: string, columns?: string[]): Promise<number> {
