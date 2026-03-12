@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import { TASK_FILE, WORKING_DIR } from '../models/constants.js';
 import { AlertType } from '../models/enums.js';
 import { notificationService } from './notification.service.js';
+import type { TaskInput } from '../models/interfaces.js';
 
 export class TaskService {
   private readonly DEFAULT_COLUMNS = ['Status', 'ID', 'Name'];
@@ -12,7 +13,7 @@ export class TaskService {
     } catch (e) {}
   }
 
-  async initChecklist(tasks: string[], goal: string, columns?: string[]): Promise<number> {
+  async initChecklist(tasks: TaskInput[], goal: string, columns?: string[]): Promise<number> {
     await this.ensureInit();
     const sanitizedGoal = goal.replace(/[\r\n]+/g, ' ').trim();
     const cols = columns && columns.length > 0 ? [...columns] : [...this.DEFAULT_COLUMNS];
@@ -21,11 +22,19 @@ export class TaskService {
     if (!cols.some(c => c.toLowerCase() === 'id')) cols.splice(cols.findIndex(c => c.toLowerCase() === 'status') + 1, 0, 'ID');
     if (!cols.some(c => c.toLowerCase() === 'name')) cols.splice(cols.findIndex(c => c.toLowerCase() === 'id') + 1, 0, 'Name');
 
+    const hasNotes = tasks.some(t => t.note);
+    if (hasNotes && !cols.some(c => c.toLowerCase() === 'note')) {
+      cols.push('Notes');
+    }
+
     const header = `| ${cols.join(' | ')} |`;
     const separator = `| ${cols.map(() => ':---').join(' | ')} |`;
     
     const rows = tasks.map((original, index) => {
-      let t = original.replace(/[\r\n]+/g, ' ').trim();
+      let t = original.name;
+      let note = original.note || '';
+      
+      t = t.replace(/[\r\n]+/g, ' ').trim();
       if (t.startsWith('- [ ] ')) {
         t = t.replace(/^-\s*\[\s*]\s*/, '').trim();
       }
@@ -35,7 +44,8 @@ export class TaskService {
         if (c === 'status') return '[ ]';
         if (c === 'id') return `${index + 1}`;
         if (c === 'name') return t;
-        return ''; // Custom columns are empty initially
+        if (c === 'note') return note;
+        return '';
       });
       
       return `| ${rowData.join(' | ')} |`;
@@ -154,7 +164,7 @@ export class TaskService {
     rows[taskRowIdx][statusIdx] = '[x]';
     
     if (note) {
-      let notesIdx = columns.findIndex(c => ['notes', 'details', 'note', 'detail'].includes(c.toLowerCase()));
+      let notesIdx = columns.findIndex(c => c.toLowerCase() === 'note');
       if (notesIdx === -1) {
         columns.push('Notes');
         notesIdx = columns.length - 1;
@@ -186,7 +196,7 @@ export class TaskService {
     const statusIdx = columns.findIndex(c => c.toLowerCase() === 'status');
     const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
     const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
-    const notesIdx = columns.findIndex(c => ['notes', 'details', 'note', 'detail'].includes(c.toLowerCase()));
+    const notesIdx = columns.findIndex(c => c.toLowerCase() === 'note');
 
     const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
     const isNumericId = /^\d+$/.test(cleanId);
@@ -211,6 +221,141 @@ export class TaskService {
     await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
 
     return true;
+  }
+
+  async addTask(taskName: string, note?: string): Promise<string> {
+    await this.ensureInit();
+    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const sections = data.split('\n\n');
+    const goalSection = sections[0];
+    const tableData = sections.slice(1).join('\n\n');
+    
+    const { columns, rows } = this.parseTable(tableData);
+    
+    const newId = (rows.length + 1).toString();
+    const rowData: string[] = columns.map(col => {
+      const c = col.toLowerCase();
+      if (c === 'status') return '[ ]';
+      if (c === 'id') return newId;
+      if (c === 'name') return taskName;
+      if (c === 'note') return note || '';
+      return '';
+    });
+    
+    rows.push(rowData);
+
+    const newTable = this.stringifyTable(columns, rows);
+    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
+    
+    return `(#${newId}) ${taskName}`;
+  }
+
+  async removeTask(taskIdentifier: string): Promise<boolean> {
+    await this.ensureInit();
+    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const sections = data.split('\n\n');
+    const goalSection = sections[0];
+    const tableData = sections.slice(1).join('\n\n');
+    
+    const { columns, rows } = this.parseTable(tableData);
+    
+    const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
+    const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
+
+    const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
+    const isNumericId = /^\d+$/.test(cleanId);
+
+    const taskRowIdx = rows.findIndex(row => {
+      if (isNumericId && row[idIdx] === cleanId) return true;
+      if (row[nameIdx] === taskIdentifier) return true;
+      return false;
+    });
+
+    if (taskRowIdx === -1) return false;
+
+    rows.splice(taskRowIdx, 1);
+    
+    rows.forEach((row, idx) => {
+      row[idIdx] = (idx + 1).toString();
+    });
+
+    const newTable = this.stringifyTable(columns, rows);
+    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
+    
+    return true;
+  }
+
+  async addTasks(tasks: { name: string, note?: string }[]): Promise<{ name: string, id: string }[]> {
+    await this.ensureInit();
+    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const sections = data.split('\n\n');
+    const goalSection = sections[0];
+    const tableData = sections.slice(1).join('\n\n');
+    
+    const { columns, rows } = this.parseTable(tableData);
+    const results: { name: string, id: string }[] = [];
+    
+    for (const task of tasks) {
+      const newId = (rows.length + 1).toString();
+      const rowData: string[] = columns.map(col => {
+        const c = col.toLowerCase();
+        if (c === 'status') return '[ ]';
+        if (c === 'id') return newId;
+        if (c === 'name') return task.name;
+        if (c === 'note') return task.note || '';
+        return '';
+      });
+      rows.push(rowData);
+      results.push({ name: task.name, id: newId });
+    }
+
+    const newTable = this.stringifyTable(columns, rows);
+    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
+    
+    return results;
+  }
+
+  async removeTasks(tasks: string[]): Promise<{ name: string, success: boolean }[]> {
+    await this.ensureInit();
+    let data = await fs.readFile(TASK_FILE, 'utf-8');
+    const sections = data.split('\n\n');
+    const goalSection = sections[0];
+    const tableData = sections.slice(1).join('\n\n');
+    
+    const { columns, rows } = this.parseTable(tableData);
+    
+    const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
+    const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
+    
+    const results: { name: string, success: boolean }[] = [];
+
+    for (const taskIdentifier of tasks) {
+      const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
+      const isNumericId = /^\d+$/.test(cleanId);
+
+      const taskRowIdx = rows.findIndex(row => {
+        if (isNumericId && row[idIdx] === cleanId) return true;
+        if (row[nameIdx] === taskIdentifier) return true;
+        return false;
+      });
+
+      if (taskRowIdx === -1) {
+        results.push({ name: taskIdentifier, success: false });
+        continue;
+      }
+
+      rows.splice(taskRowIdx, 1);
+      results.push({ name: taskIdentifier, success: true });
+    }
+
+    rows.forEach((row, idx) => {
+      row[idIdx] = (idx + 1).toString();
+    });
+
+    const newTable = this.stringifyTable(columns, rows);
+    await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
+    
+    return results;
   }
 }
 
