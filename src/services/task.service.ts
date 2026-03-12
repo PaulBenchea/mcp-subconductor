@@ -1,11 +1,11 @@
 import fs from 'fs/promises';
 import { TASK_FILE, WORKING_DIR } from '../models/constants.js';
-import { AlertType } from '../models/enums.js';
+import { AlertType, TaskColumn } from '../models/enums.js';
 import { notificationService } from './notification.service.js';
 import type { TaskInput } from '../models/interfaces.js';
 
 export class TaskService {
-  private readonly DEFAULT_COLUMNS = ['Status', 'ID', 'Name'];
+  private readonly DEFAULT_COLUMNS = [TaskColumn.Status, TaskColumn.ID, TaskColumn.Name];
 
   async ensureInit(): Promise<void> {
     try {
@@ -18,13 +18,13 @@ export class TaskService {
     const sanitizedGoal = goal.replace(/[\r\n]+/g, ' ').trim();
     const cols = columns && columns.length > 0 ? [...columns] : [...this.DEFAULT_COLUMNS];
     
-    if (!cols.some(c => c.toLowerCase() === 'status')) cols.unshift('Status');
-    if (!cols.some(c => c.toLowerCase() === 'id')) cols.splice(cols.findIndex(c => c.toLowerCase() === 'status') + 1, 0, 'ID');
-    if (!cols.some(c => c.toLowerCase() === 'name')) cols.splice(cols.findIndex(c => c.toLowerCase() === 'id') + 1, 0, 'Name');
+    if (!cols.some(c => c.toLowerCase() === TaskColumn.Status.toLowerCase())) cols.unshift(TaskColumn.Status);
+    if (!cols.some(c => c.toLowerCase() === TaskColumn.ID.toLowerCase())) cols.splice(cols.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase()) + 1, 0, TaskColumn.ID);
+    if (!cols.some(c => c.toLowerCase() === TaskColumn.Name.toLowerCase())) cols.splice(cols.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase()) + 1, 0, TaskColumn.Name);
 
     const hasNotes = tasks.some(t => t.note);
-    if (hasNotes && !cols.some(c => c.toLowerCase() === 'note')) {
-      cols.push('Notes');
+    if (hasNotes && !cols.some(c => c.toLowerCase() === TaskColumn.Notes.toLowerCase() || c.toLowerCase() === 'note')) {
+      cols.push(TaskColumn.Notes);
     }
 
     const header = `| ${cols.join(' | ')} |`;
@@ -41,17 +41,17 @@ export class TaskService {
       
       const rowData: string[] = cols.map(col => {
         const c = col.toLowerCase();
-        if (c === 'status') return '[ ]';
-        if (c === 'id') return `${index + 1}`;
-        if (c === 'name') return t;
-        if (c === 'notes') return note;
+        if (c === TaskColumn.Status.toLowerCase()) return '[ ]';
+        if (c === TaskColumn.ID.toLowerCase()) return `${index + 1}`;
+        if (c === TaskColumn.Name.toLowerCase()) return t;
+        if (c === TaskColumn.Notes.toLowerCase() || c === 'note') return note;
         return '';
       });
       
       return `| ${rowData.join(' | ')} |`;
     });
 
-    const content = `# Goal: ${sanitizedGoal}\n\n${header}\n${separator}\n${rows.join('\n')}`;
+    const content = `# Goal: [0/${tasks.length}] ${sanitizedGoal}\n\n${header}\n${separator}\n${rows.join('\n')}`;
     await fs.writeFile(TASK_FILE, content);
     return tasks.length;
   }
@@ -76,15 +76,19 @@ export class TaskService {
     return `${header}\n${separator}\n${rowLines.join('\n')}`;
   }
 
+  private updateGoalHeader(goalSection: string, resolved: number, total: number): string {
+    return goalSection.replace(/# Goal: (\[\d+\/\d+\] )?/, `# Goal: [${resolved}/${total}] `);
+  }
+
   async getPendingTask(): Promise<string | null> {
     await this.ensureInit();
     try {
       const data = await fs.readFile(TASK_FILE, 'utf-8');
       const { columns, rows } = this.parseTable(data);
       
-      const statusIdx = columns.findIndex(c => c.toLowerCase() === 'status');
-      const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
-      const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
+      const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
+      const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
+      const nameIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Name.toLowerCase());
 
       const pendingRow = rows.find(row => row[statusIdx] === '[ ]');
       if (!pendingRow) return null;
@@ -101,9 +105,9 @@ export class TaskService {
       const data = await fs.readFile(TASK_FILE, 'utf-8');
       const { columns, rows } = this.parseTable(data);
       
-      const statusIdx = columns.findIndex(c => c.toLowerCase() === 'status');
-      const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
-      const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
+      const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
+      const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
+      const nameIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Name.toLowerCase());
 
       return rows
         .filter(row => row[statusIdx] === '[ ]')
@@ -138,24 +142,22 @@ export class TaskService {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
     const sections = data.split('\n\n');
-    const goalSection = sections[0];
+    let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
     
     const { columns, rows } = this.parseTable(tableData);
     
-    const statusIdx = columns.findIndex(c => c.toLowerCase() === 'status');
-    const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
-    const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
+    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
+    const nameIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Name.toLowerCase());
 
     const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
     const isNumericId = /^\d+$/.test(cleanId);
 
     const taskRowIdx = rows.findIndex(row => {
       if (row[statusIdx] !== '[ ]') return false;
-      
       if (isNumericId && row[idIdx] === cleanId) return true;
       if (row[nameIdx] === taskIdentifier) return true;
-      
       return false;
     });
 
@@ -164,15 +166,18 @@ export class TaskService {
     rows[taskRowIdx][statusIdx] = '[x]';
     
     if (note) {
-      let notesIdx = columns.findIndex(c => c.toLowerCase() === 'note');
+      let notesIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Notes.toLowerCase() || c.toLowerCase() === 'note');
       if (notesIdx === -1) {
-        columns.push('Notes');
+        columns.push(TaskColumn.Notes);
         notesIdx = columns.length - 1;
         rows.forEach(row => row.push(''));
       }
       const currentNote = rows[taskRowIdx][notesIdx];
       rows[taskRowIdx][notesIdx] = currentNote ? `${currentNote} | ${note}` : note;
     }
+
+    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
 
     const newTable = this.stringifyTable(columns, rows);
     await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
@@ -188,25 +193,23 @@ export class TaskService {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
     const sections = data.split('\n\n');
-    const goalSection = sections[0];
+    let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
     
     const { columns, rows } = this.parseTable(tableData);
     
-    const statusIdx = columns.findIndex(c => c.toLowerCase() === 'status');
-    const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
-    const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
-    const notesIdx = columns.findIndex(c => c.toLowerCase() === 'note');
+    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
+    const nameIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Name.toLowerCase());
+    const notesIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Notes.toLowerCase() || c.toLowerCase() === 'note');
 
     const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
     const isNumericId = /^\d+$/.test(cleanId);
 
     const taskRowIdx = rows.findIndex(row => {
       if (row[statusIdx] !== '[x]') return false;
-      
       if (isNumericId && row[idIdx] === cleanId) return true;
       if (row[nameIdx] === taskIdentifier) return true;
-      
       return false;
     });
 
@@ -216,6 +219,9 @@ export class TaskService {
     if (notesIdx !== -1) {
       rows[taskRowIdx][notesIdx] = '';
     }
+
+    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
 
     const newTable = this.stringifyTable(columns, rows);
     await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
@@ -227,7 +233,7 @@ export class TaskService {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
     const sections = data.split('\n\n');
-    const goalSection = sections[0];
+    let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
     
     const { columns, rows } = this.parseTable(tableData);
@@ -235,14 +241,18 @@ export class TaskService {
     const newId = (rows.length + 1).toString();
     const rowData: string[] = columns.map(col => {
       const c = col.toLowerCase();
-      if (c === 'status') return '[ ]';
-      if (c === 'id') return newId;
-      if (c === 'name') return taskName;
-      if (c === 'notes') return note || '';
+      if (c === TaskColumn.Status.toLowerCase()) return '[ ]';
+      if (c === TaskColumn.ID.toLowerCase()) return newId;
+      if (c === TaskColumn.Name.toLowerCase()) return taskName;
+      if (c === TaskColumn.Notes.toLowerCase() || c === 'note') return note || '';
       return '';
     });
     
     rows.push(rowData);
+
+    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
 
     const newTable = this.stringifyTable(columns, rows);
     await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
@@ -254,13 +264,14 @@ export class TaskService {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
     const sections = data.split('\n\n');
-    const goalSection = sections[0];
+    let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
     
     const { columns, rows } = this.parseTable(tableData);
     
-    const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
-    const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
+    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
+    const nameIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Name.toLowerCase());
 
     const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
     const isNumericId = /^\d+$/.test(cleanId);
@@ -279,6 +290,9 @@ export class TaskService {
       row[idIdx] = (idx + 1).toString();
     });
 
+    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
+
     const newTable = this.stringifyTable(columns, rows);
     await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
     
@@ -289,7 +303,7 @@ export class TaskService {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
     const sections = data.split('\n\n');
-    const goalSection = sections[0];
+    let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
     
     const { columns, rows } = this.parseTable(tableData);
@@ -299,15 +313,19 @@ export class TaskService {
       const newId = (rows.length + 1).toString();
       const rowData: string[] = columns.map(col => {
         const c = col.toLowerCase();
-        if (c === 'status') return '[ ]';
-        if (c === 'id') return newId;
-        if (c === 'name') return task.name;
-        if (c === 'notes') return task.note || '';
+        if (c === TaskColumn.Status.toLowerCase()) return '[ ]';
+        if (c === TaskColumn.ID.toLowerCase()) return newId;
+        if (c === TaskColumn.Name.toLowerCase()) return task.name;
+        if (c === TaskColumn.Notes.toLowerCase() || c === 'note') return task.note || '';
         return '';
       });
       rows.push(rowData);
       results.push({ name: task.name, id: newId });
     }
+
+    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
 
     const newTable = this.stringifyTable(columns, rows);
     await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
@@ -319,13 +337,13 @@ export class TaskService {
     await this.ensureInit();
     let data = await fs.readFile(TASK_FILE, 'utf-8');
     const sections = data.split('\n\n');
-    const goalSection = sections[0];
+    let goalSection = sections[0];
     const tableData = sections.slice(1).join('\n\n');
     
     const { columns, rows } = this.parseTable(tableData);
     
-    const idIdx = columns.findIndex(c => c.toLowerCase() === 'id');
-    const nameIdx = columns.findIndex(c => c.toLowerCase() === 'name');
+    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
     
     const results: { name: string, success: boolean }[] = [];
 
@@ -335,7 +353,7 @@ export class TaskService {
 
       const taskRowIdx = rows.findIndex(row => {
         if (isNumericId && row[idIdx] === cleanId) return true;
-        if (row[nameIdx] === taskIdentifier) return true;
+        if (row[idIdx] === taskIdentifier) return true; // Fallback for name if needed
         return false;
       });
 
@@ -351,6 +369,9 @@ export class TaskService {
     rows.forEach((row, idx) => {
       row[idIdx] = (idx + 1).toString();
     });
+
+    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
 
     const newTable = this.stringifyTable(columns, rows);
     await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
