@@ -67,7 +67,7 @@ export class TaskService {
     const lines = indexData.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     const relativePath = `./checklists/${shortName}/checklist.md`;
     const progress = `[${resolved}/${total}]`;
-    const statusText = status === ChecklistStatus.Done ? '[x] Done' : `[ ] ${status}`;
+    const statusText = status;
     const newEntry = `| ${statusText} | ${progress} | ${goal} | [Link](${relativePath}) |`;
 
     const existingRows: string[] = [];
