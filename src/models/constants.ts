@@ -6,6 +6,8 @@ export const APP_NAME = 'Subconductor';
 export const APP_VERSION = packageJson.version;
 
 export const WORKING_DIR = path.join(process.cwd(), '.subconductor');
+export const CHECKLISTS_DIR = path.join(WORKING_DIR, 'checklists');
+export const CHECKLISTS_INDEX_FILE = path.join(WORKING_DIR, 'checklists.md');
 export const TASK_FILE = path.join(WORKING_DIR, 'tasks.md');
 
 export const NOTIFICATION_SOUNDS = {
