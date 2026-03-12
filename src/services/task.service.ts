@@ -14,8 +14,28 @@ export class TaskService {
     try {
       await fs.access(CHECKLISTS_INDEX_FILE);
     } catch (error) {
-      await fs.writeFile(CHECKLISTS_INDEX_FILE, '# Subconductor Checklists\n\n');
+      await fs.writeFile(CHECKLISTS_INDEX_FILE, '# Subconductor Checklists\n\n| Status | Progress | Goal | Path |\n| :--- | :--- | :--- | :--- |');
     }
+
+    try {
+      await fs.access(TASK_FILE);
+      const data = await fs.readFile(TASK_FILE, 'utf-8');
+      const sections = data.split('\n\n');
+      const goalSection = sections[0] || '';
+      const goalMatch = goalSection.match(/# Goal:\s*(?:\[\d+\/\d+\]\s*)?(.*)/);
+      const goal = goalMatch && goalMatch[1] ? goalMatch[1].trim() : 'Legacy Checklist';
+      
+      const shortName = goal.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 20).replace(/^-|-$/g, '') || 'legacy';
+      
+      const checklistDir = path.join(CHECKLISTS_DIR, shortName);
+      await fs.mkdir(checklistDir, { recursive: true });
+      const checklistPath = path.join(checklistDir, 'checklist.md');
+      
+      await fs.rename(TASK_FILE, checklistPath);
+      
+      await this.updateChecklistsIndex(shortName, goal, 0, 0, 'Active');
+      await this.syncProgress(checklistPath);
+    } catch (error) {}
   }
 
   private async getActiveChecklistPath(): Promise<string> {
@@ -24,7 +44,7 @@ export class TaskService {
       const indexData = await fs.readFile(CHECKLISTS_INDEX_FILE, 'utf-8');
       const lines = indexData.split('\n');
       for (const line of lines) {
-        if (line.includes('[Active]')) {
+        if (line.includes('Active')) {
           const match = line.match(/\((.*?)\)/);
           if (match) {
             return path.join(WORKING_DIR, match[1]);
@@ -33,12 +53,7 @@ export class TaskService {
       }
     } catch (error) {}
     
-    try {
-      await fs.access(TASK_FILE);
-      return TASK_FILE;
-    } catch (error) {
-      throw new Error('No active checklist found or invalid format. Run init_checklist first.');
-    }
+    throw new Error('No active checklist found or invalid format. Run init_checklist first.');
   }
 
   private async updateChecklistsIndex(shortName: string, goal: string, resolved: number, total: number, status: 'Active' | 'Pending' | 'Done'): Promise<void> {
@@ -50,34 +65,38 @@ export class TaskService {
     }
 
     const lines = indexData.split('\n');
-    const headerLines = lines.slice(0, 4); // Keep the "# Subconductor Checklists\n\n| Status | Progress | Goal | Path |\n| :--- | :--- | :--- | :--- |"
-    let tableLines = lines.slice(4);
-    
-    // In case the file existed but was using the old list format, reset it to table format
-    if (!indexData.includes('| Status |')) {
-        indexData = '# Subconductor Checklists\n\n| Status | Progress | Goal | Path |\n| :--- | :--- | :--- | :--- |';
-        tableLines = [];
-    }
-
     const relativePath = `./checklists/${shortName}/checklist.md`;
     const progress = `[${resolved}/${total}]`;
-    const newEntry = `| ${status === 'Done' ? '[x]' : '[ ]'} ${status} | ${progress} | ${goal} | [Link](${relativePath}) |`;
+    const statusText = status === 'Done' ? '[x] Done' : `[ ] ${status}`;
+    const newEntry = `| ${statusText} | ${progress} | ${goal} | [Link](${relativePath}) |`;
+
+    const updatedLines = [
+      '# Subconductor Checklists',
+      '',
+      '| Status | Progress | Goal | Path |',
+      '| :--- | :--- | :--- | :--- |'
+    ];
 
     let found = false;
-    for (let i = 0; i < tableLines.length; i++) {
-      if (tableLines[i].includes(`(${relativePath})`)) {
-        tableLines[i] = newEntry;
+    for (const line of lines) {
+      if (!line.startsWith('|') || line.includes('Status | Progress')) continue;
+      if (line.includes('--- | ---')) continue;
+
+      let processedLine = line;
+      if (line.includes(`(${relativePath})`)) {
+        processedLine = newEntry;
         found = true;
-      } else if (status === 'Active' && tableLines[i].includes('Active')) {
-        tableLines[i] = tableLines[i].replace('Active', 'Pending');
+      } else if (status === 'Active') {
+        processedLine = line.replace('Active', 'Pending');
       }
+      updatedLines.push(processedLine);
     }
 
     if (!found) {
-      tableLines.push(newEntry);
+      updatedLines.push(newEntry);
     }
 
-    await fs.writeFile(CHECKLISTS_INDEX_FILE, `${headerLines.join('\n')}\n${tableLines.join('\n')}`);
+    await fs.writeFile(CHECKLISTS_INDEX_FILE, updatedLines.join('\n'));
   }
 
   async initChecklist(tasks: TaskInput[], goal: string, columns?: string[]): Promise<number> {
