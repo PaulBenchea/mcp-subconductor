@@ -10,59 +10,65 @@ export class TaskService {
   async ensureInit(): Promise<void> {
     try {
       await fs.mkdir(WORKING_DIR, { recursive: true });
-    } catch (e) {}
+    } catch (error) {}
   }
 
   async initChecklist(tasks: TaskInput[], goal: string, columns?: string[]): Promise<number> {
     await this.ensureInit();
     const sanitizedGoal = goal.replace(/[\r\n]+/g, ' ').trim();
-    const cols = columns && columns.length > 0 ? [...columns] : [...this.DEFAULT_COLUMNS];
+    const headers = columns && columns.length > 0 ? [...columns] : [...this.DEFAULT_COLUMNS];
     
-    if (!cols.some(c => c.toLowerCase() === TaskColumn.Status.toLowerCase())) cols.unshift(TaskColumn.Status);
-    if (!cols.some(c => c.toLowerCase() === TaskColumn.ID.toLowerCase())) cols.splice(cols.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase()) + 1, 0, TaskColumn.ID);
-    if (!cols.some(c => c.toLowerCase() === TaskColumn.Name.toLowerCase())) cols.splice(cols.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase()) + 1, 0, TaskColumn.Name);
-
-    const hasNotes = tasks.some(t => t.note);
-    if (hasNotes && !cols.some(c => c.toLowerCase() === TaskColumn.Notes.toLowerCase() || c.toLowerCase() === 'note')) {
-      cols.push(TaskColumn.Notes);
+    if (!headers.some(column => column.toLowerCase() === TaskColumn.Status.toLowerCase())) {
+      headers.unshift(TaskColumn.Status);
+    }
+    if (!headers.some(column => column.toLowerCase() === TaskColumn.ID.toLowerCase())) {
+      headers.splice(headers.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase()) + 1, 0, TaskColumn.ID);
+    }
+    if (!headers.some(column => column.toLowerCase() === TaskColumn.Name.toLowerCase())) {
+      headers.splice(headers.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase()) + 1, 0, TaskColumn.Name);
     }
 
-    const header = `| ${cols.join(' | ')} |`;
-    const separator = `| ${cols.map(() => ':---').join(' | ')} |`;
+    const hasNotes = tasks.some(task => task.note);
+    if (hasNotes && !headers.some(column => column.toLowerCase() === TaskColumn.Notes.toLowerCase() || column.toLowerCase() === 'notes')) {
+      headers.push(TaskColumn.Notes);
+    }
+
+    const markdownHeader = `| ${headers.join(' | ')} |`;
+    const separator = `| ${headers.map(() => ':---').join(' | ')} |`;
     
-    const rows = tasks.map((original, index) => {
-      let t = original.name;
-      let note = original.note || '';
+    const rows = tasks.map((taskInput, index) => {
+      let taskName = taskInput.name;
+      let note = taskInput.note || '';
       
-      t = t.replace(/[\r\n]+/g, ' ').trim();
-      if (t.startsWith('- [ ] ')) {
-        t = t.replace(/^-\s*\[\s*]\s*/, '').trim();
+      taskName = taskName.replace(/[\r\n]+/g, ' ').trim();
+      if (taskName.startsWith('- [ ] ')) {
+        taskName = taskName.replace(/^-\s*\[\s*]\s*/, '').trim();
       }
       
-      const rowData: string[] = cols.map(col => {
-        const c = col.toLowerCase();
-        if (c === TaskColumn.Status.toLowerCase()) return '[ ]';
-        if (c === TaskColumn.ID.toLowerCase()) return `${index + 1}`;
-        if (c === TaskColumn.Name.toLowerCase()) return t;
-        if (c === TaskColumn.Notes.toLowerCase() || c === 'note') return note;
+      const rowData: string[] = headers.map(column => {
+        const columnLower = column.toLowerCase();
+        if (columnLower === TaskColumn.Status.toLowerCase()) return '[ ]';
+        if (columnLower === TaskColumn.ID.toLowerCase()) return `${index + 1}`;
+        if (columnLower === TaskColumn.Name.toLowerCase()) return taskName;
+        if (columnLower === TaskColumn.Notes.toLowerCase() || columnLower === 'notes') return note;
         return '';
       });
       
       return `| ${rowData.join(' | ')} |`;
     });
 
-    const content = `# Goal: [0/${tasks.length}] ${sanitizedGoal}\n\n${header}\n${separator}\n${rows.join('\n')}`;
+    const content = `# Goal: [0/${tasks.length}] ${sanitizedGoal}\n\n${markdownHeader}\n${separator}\n${rows.join('\n')}`;
     await fs.writeFile(TASK_FILE, content);
     return tasks.length;
   }
 
   private parseTable(data: string): { columns: string[], rows: string[][] } {
-    const lines = data.split('\n').map(l => l.trim()).filter(l => l.startsWith('|'));
+    const lines = data.split('\n').map(line => line.trim()).filter(line => line.startsWith('|'));
     if (lines.length < 2) throw new Error('Invalid task table format.');
 
-    const columns = lines[0].split('|').map(c => c.trim()).filter(c => c !== '');
+    const columns = lines[0].split('|').map(column => column.trim()).filter(column => column !== '');
     const rows = lines.slice(2).map(line => {
-      const cells = line.split('|').map(c => c.trim());
+      const cells = line.split('|').map(cell => cell.trim());
       return cells.slice(1, -1);
     });
 
@@ -86,15 +92,15 @@ export class TaskService {
       const data = await fs.readFile(TASK_FILE, 'utf-8');
       const { columns, rows } = this.parseTable(data);
       
-      const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
-      const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
-      const nameIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Name.toLowerCase());
+      const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
+      const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
+      const nameIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Name.toLowerCase());
 
-      const pendingRow = rows.find(row => row[statusIdx] === '[ ]');
+      const pendingRow = rows.find(row => row[statusIndex] === '[ ]');
       if (!pendingRow) return null;
 
-      return `(#${pendingRow[idIdx]}) ${pendingRow[nameIdx]}`;
-    } catch (err) {
+      return `(#${pendingRow[idIndex]}) ${pendingRow[nameIndex]}`;
+    } catch (error) {
       throw new Error('No active checklist found or invalid format. Run init_checklist first.');
     }
   }
@@ -105,15 +111,15 @@ export class TaskService {
       const data = await fs.readFile(TASK_FILE, 'utf-8');
       const { columns, rows } = this.parseTable(data);
       
-      const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
-      const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
-      const nameIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Name.toLowerCase());
+      const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
+      const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
+      const nameIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Name.toLowerCase());
 
       return rows
-        .filter(row => row[statusIdx] === '[ ]')
+        .filter(row => row[statusIndex] === '[ ]')
         .slice(0, count)
-        .map(row => `(#${row[idIdx]}) ${row[nameIdx]}`);
-    } catch (err) {
+        .map(row => `(#${row[idIndex]}) ${row[nameIndex]}`);
+    } catch (error) {
       throw new Error('No active checklist found or invalid format. Run init_checklist first.');
     }
   }
@@ -121,9 +127,9 @@ export class TaskService {
   async markTasksDone(tasks: { name: string, note?: string }[]): Promise<{ name: string, success: boolean }[]> {
     await this.ensureInit();
     const results = [];
-    for (const t of tasks) {
-      const success = await this.markTaskDone(t.name, t.note);
-      results.push({ name: t.name, success });
+    for (const task of tasks) {
+      const success = await this.markTaskDone(task.name, task.note);
+      results.push({ name: task.name, success });
     }
     return results;
   }
@@ -131,9 +137,9 @@ export class TaskService {
   async unmarkTasks(tasks: string[]): Promise<{ name: string, success: boolean }[]> {
     await this.ensureInit();
     const results = [];
-    for (const t of tasks) {
-      const success = await this.unmarkTask(t);
-      results.push({ name: t, success });
+    for (const task of tasks) {
+      const success = await this.unmarkTask(task);
+      results.push({ name: task, success });
     }
     return results;
   }
@@ -147,42 +153,42 @@ export class TaskService {
     
     const { columns, rows } = this.parseTable(tableData);
     
-    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
-    const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
-    const nameIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Name.toLowerCase());
+    const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
+    const nameIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Name.toLowerCase());
 
     const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
     const isNumericId = /^\d+$/.test(cleanId);
 
-    const taskRowIdx = rows.findIndex(row => {
-      if (row[statusIdx] !== '[ ]') return false;
-      if (isNumericId && row[idIdx] === cleanId) return true;
-      if (row[nameIdx] === taskIdentifier) return true;
+    const taskRowIndex = rows.findIndex(row => {
+      if (row[statusIndex] !== '[ ]') return false;
+      if (isNumericId && row[idIndex] === cleanId) return true;
+      if (row[nameIndex] === taskIdentifier) return true;
       return false;
     });
 
-    if (taskRowIdx === -1) return false;
+    if (taskRowIndex === -1) return false;
 
-    rows[taskRowIdx][statusIdx] = '[x]';
+    rows[taskRowIndex][statusIndex] = '[x]';
     
     if (note) {
-      let notesIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Notes.toLowerCase() || c.toLowerCase() === 'note');
-      if (notesIdx === -1) {
+      let notesIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Notes.toLowerCase() || column.toLowerCase() === 'notes');
+      if (notesIndex === -1) {
         columns.push(TaskColumn.Notes);
-        notesIdx = columns.length - 1;
+        notesIndex = columns.length - 1;
         rows.forEach(row => row.push(''));
       }
-      const currentNote = rows[taskRowIdx][notesIdx];
-      rows[taskRowIdx][notesIdx] = currentNote ? `${currentNote} | ${note}` : note;
+      const currentNote = rows[taskRowIndex][notesIndex];
+      rows[taskRowIndex][notesIndex] = currentNote ? `${currentNote} | ${note}` : note;
     }
 
-    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
     goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
 
     const newTable = this.stringifyTable(columns, rows);
     await fs.writeFile(TASK_FILE, `${goalSection}\n\n${newTable}`);
 
-    if (!rows.some(row => row[statusIdx] === '[ ]')) {
+    if (!rows.some(row => row[statusIndex] === '[ ]')) {
       await notificationService.alert('Checklist Complete', 'All tasks in your manifest are finished!', AlertType.Info);
     }
 
@@ -198,29 +204,29 @@ export class TaskService {
     
     const { columns, rows } = this.parseTable(tableData);
     
-    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
-    const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
-    const nameIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Name.toLowerCase());
-    const notesIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Notes.toLowerCase() || c.toLowerCase() === 'note');
+    const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
+    const nameIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Name.toLowerCase());
+    const notesIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Notes.toLowerCase() || column.toLowerCase() === 'notes');
 
     const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
     const isNumericId = /^\d+$/.test(cleanId);
 
-    const taskRowIdx = rows.findIndex(row => {
-      if (row[statusIdx] !== '[x]') return false;
-      if (isNumericId && row[idIdx] === cleanId) return true;
-      if (row[nameIdx] === taskIdentifier) return true;
+    const taskRowIndex = rows.findIndex(row => {
+      if (row[statusIndex] !== '[x]') return false;
+      if (isNumericId && row[idIndex] === cleanId) return true;
+      if (row[nameIndex] === taskIdentifier) return true;
       return false;
     });
 
-    if (taskRowIdx === -1) return false;
+    if (taskRowIndex === -1) return false;
 
-    rows[taskRowIdx][statusIdx] = '[ ]';
-    if (notesIdx !== -1) {
-      rows[taskRowIdx][notesIdx] = '';
+    rows[taskRowIndex][statusIndex] = '[ ]';
+    if (notesIndex !== -1) {
+      rows[taskRowIndex][notesIndex] = '';
     }
 
-    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
     goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
 
     const newTable = this.stringifyTable(columns, rows);
@@ -239,19 +245,19 @@ export class TaskService {
     const { columns, rows } = this.parseTable(tableData);
     
     const newId = (rows.length + 1).toString();
-    const rowData: string[] = columns.map(col => {
-      const c = col.toLowerCase();
-      if (c === TaskColumn.Status.toLowerCase()) return '[ ]';
-      if (c === TaskColumn.ID.toLowerCase()) return newId;
-      if (c === TaskColumn.Name.toLowerCase()) return taskName;
-      if (c === TaskColumn.Notes.toLowerCase() || c === 'note') return note || '';
+    const rowData: string[] = columns.map(column => {
+      const columnLower = column.toLowerCase();
+      if (columnLower === TaskColumn.Status.toLowerCase()) return '[ ]';
+      if (columnLower === TaskColumn.ID.toLowerCase()) return newId;
+      if (columnLower === TaskColumn.Name.toLowerCase()) return taskName;
+      if (columnLower === TaskColumn.Notes.toLowerCase() || columnLower === 'notes') return note || '';
       return '';
     });
     
     rows.push(rowData);
 
-    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
-    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
     goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
 
     const newTable = this.stringifyTable(columns, rows);
@@ -269,28 +275,28 @@ export class TaskService {
     
     const { columns, rows } = this.parseTable(tableData);
     
-    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
-    const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
-    const nameIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Name.toLowerCase());
+    const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
+    const nameIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Name.toLowerCase());
 
     const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
     const isNumericId = /^\d+$/.test(cleanId);
 
-    const taskRowIdx = rows.findIndex(row => {
-      if (isNumericId && row[idIdx] === cleanId) return true;
-      if (row[nameIdx] === taskIdentifier) return true;
+    const taskRowIndex = rows.findIndex(row => {
+      if (isNumericId && row[idIndex] === cleanId) return true;
+      if (row[nameIndex] === taskIdentifier) return true;
       return false;
     });
 
-    if (taskRowIdx === -1) return false;
+    if (taskRowIndex === -1) return false;
 
-    rows.splice(taskRowIdx, 1);
+    rows.splice(taskRowIndex, 1);
     
-    rows.forEach((row, idx) => {
-      row[idIdx] = (idx + 1).toString();
+    rows.forEach((row, index) => {
+      row[idIndex] = (index + 1).toString();
     });
 
-    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
     goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
 
     const newTable = this.stringifyTable(columns, rows);
@@ -311,20 +317,20 @@ export class TaskService {
     
     for (const task of tasks) {
       const newId = (rows.length + 1).toString();
-      const rowData: string[] = columns.map(col => {
-        const c = col.toLowerCase();
-        if (c === TaskColumn.Status.toLowerCase()) return '[ ]';
-        if (c === TaskColumn.ID.toLowerCase()) return newId;
-        if (c === TaskColumn.Name.toLowerCase()) return task.name;
-        if (c === TaskColumn.Notes.toLowerCase() || c === 'note') return task.note || '';
+      const rowData: string[] = columns.map(column => {
+        const columnLower = column.toLowerCase();
+        if (columnLower === TaskColumn.Status.toLowerCase()) return '[ ]';
+        if (columnLower === TaskColumn.ID.toLowerCase()) return newId;
+        if (columnLower === TaskColumn.Name.toLowerCase()) return task.name;
+        if (columnLower === TaskColumn.Notes.toLowerCase() || columnLower === 'notes') return task.note || '';
         return '';
       });
       rows.push(rowData);
       results.push({ name: task.name, id: newId });
     }
 
-    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
-    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
     goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
 
     const newTable = this.stringifyTable(columns, rows);
@@ -342,8 +348,8 @@ export class TaskService {
     
     const { columns, rows } = this.parseTable(tableData);
     
-    const statusIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.Status.toLowerCase());
-    const idIdx = columns.findIndex(c => c.toLowerCase() === TaskColumn.ID.toLowerCase());
+    const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
+    const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
     
     const results: { name: string, success: boolean }[] = [];
 
@@ -351,26 +357,26 @@ export class TaskService {
       const cleanId = taskIdentifier.replace(/[()#]/g, '').trim();
       const isNumericId = /^\d+$/.test(cleanId);
 
-      const taskRowIdx = rows.findIndex(row => {
-        if (isNumericId && row[idIdx] === cleanId) return true;
-        if (row[idIdx] === taskIdentifier) return true; // Fallback for name if needed
+      const taskRowIndex = rows.findIndex(row => {
+        if (isNumericId && row[idIndex] === cleanId) return true;
+        if (row[idIndex] === taskIdentifier) return true;
         return false;
       });
 
-      if (taskRowIdx === -1) {
+      if (taskRowIndex === -1) {
         results.push({ name: taskIdentifier, success: false });
         continue;
       }
 
-      rows.splice(taskRowIdx, 1);
+      rows.splice(taskRowIndex, 1);
       results.push({ name: taskIdentifier, success: true });
     }
 
-    rows.forEach((row, idx) => {
-      row[idIdx] = (idx + 1).toString();
+    rows.forEach((row, index) => {
+      row[idIndex] = (index + 1).toString();
     });
 
-    const resolved = rows.filter(r => r[statusIdx] === '[x]').length;
+    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
     goalSection = this.updateGoalHeader(goalSection, resolved, rows.length);
 
     const newTable = this.stringifyTable(columns, rows);

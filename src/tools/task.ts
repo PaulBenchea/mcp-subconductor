@@ -39,9 +39,9 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
           content: [{ type: 'text', text: task ?? 'DONE' }]
         };
       }
-      catch (err: any) {
+      catch (error: any) {
         return {
-          content: [{ type: 'text', text: err.message }]
+          content: [{ type: 'text', text: error.message }]
         };
       }
     }
@@ -66,9 +66,9 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
           }]
         };
       }
-      catch (err: any) {
+      catch (error: any) {
         return {
-          content: [{ type: 'text', text: `Error: ${err.message}` }]
+          content: [{ type: 'text', text: `Error: ${error.message}` }]
         };
       }
     }
@@ -109,8 +109,8 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
           content: [{ type: 'text', text: `Added task: ${result}` }]
         };
       }
-      catch (err: any) {
-        return { content: [{ type: 'text', text: `Error: ${err.message}` }] };
+      catch (error: any) {
+        return { content: [{ type: 'text', text: `Error: ${error.message}` }] };
       }
     }
   );
@@ -133,8 +133,8 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
           }]
         };
       }
-      catch (err: any) {
-        return { content: [{ type: 'text', text: `Error: ${err.message}` }] };
+      catch (error: any) {
+        return { content: [{ type: 'text', text: `Error: ${error.message}` }] };
       }
     }
   );
@@ -155,9 +155,9 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
             content: [{ type: 'text', text: tasks.length > 0 ? tasks.join('\n') : 'DONE' }]
           };
         }
-        catch (err: any) {
+        catch (error: any) {
           return {
-            content: [{ type: 'text', text: err.message }]
+            content: [{ type: 'text', text: error.message }]
           };
         }
       }
@@ -177,14 +177,14 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       async ({ tasks }) => {
         try {
           const results = await taskService.markTasksDone(tasks);
-          const summary = results.map(r => `${r.name}: ${r.success ? 'Success' : 'Failed'}`).join('\n');
+          const summary = results.map(result => `${result.name}: ${result.success ? 'Success' : 'Failed'}`).join('\n');
           return {
             content: [{ type: 'text', text: summary }]
           };
         }
-        catch (err: any) {
+        catch (error: any) {
           return {
-            content: [{ type: 'text', text: err.message }]
+            content: [{ type: 'text', text: error.message }]
           };
         }
       }
@@ -201,14 +201,14 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       async ({ tasks }) => {
         try {
           const results = await taskService.unmarkTasks(tasks);
-          const summary = results.map(r => `${r.name}: ${r.success ? 'Success' : 'Failed'}`).join('\n');
+          const summary = results.map(result => `${result.name}: ${result.success ? 'Success' : 'Failed'}`).join('\n');
           return {
             content: [{ type: 'text', text: summary }]
           };
         }
-        catch (err: any) {
+        catch (error: any) {
           return {
-            content: [{ type: 'text', text: err.message }]
+            content: [{ type: 'text', text: error.message }]
           };
         }
       }
@@ -228,11 +228,11 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       async ({ tasks }) => {
         try {
           const results = await taskService.addTasks(tasks);
-          const summary = results.map(r => `Added task: (#${r.id}) ${r.name}`).join('\n');
+          const summary = results.map(result => `Added task: (#${result.id}) ${result.name}`).join('\n');
           return { content: [{ type: 'text', text: summary }] };
         }
-        catch (err: any) {
-          return { content: [{ type: 'text', text: `Error: ${err.message}` }] };
+        catch (error: any) {
+          return { content: [{ type: 'text', text: `Error: ${error.message}` }] };
         }
       }
     );
@@ -248,11 +248,11 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       async ({ tasks }) => {
         try {
           const results = await taskService.removeTasks(tasks);
-          const summary = results.map(r => `${r.name}: ${r.success ? 'Removed' : 'Not found'}`).join('\n');
+          const summary = results.map(result => `${result.name}: ${result.success ? 'Removed' : 'Not found'}`).join('\n');
           return { content: [{ type: 'text', text: summary }] };
         }
-        catch (err: any) {
-          return { content: [{ type: 'text', text: `Error: ${err.message}` }] };
+        catch (error: any) {
+          return { content: [{ type: 'text', text: `Error: ${error.message}` }] };
         }
       }
     );

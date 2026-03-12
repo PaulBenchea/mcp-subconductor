@@ -30,7 +30,7 @@ async function main() {
   await server.connect(transport);
 }
 
-main().catch(async (err) => {
-  await notificationService.alert('Subconductor Crash', err.message, AlertType.Error);
+main().catch(async (error) => {
+  await notificationService.alert('Subconductor Crash', error.message, AlertType.Error);
   process.exit(1);
 });
