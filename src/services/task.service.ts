@@ -44,7 +44,7 @@ export class TaskService {
         if (c === 'status') return '[ ]';
         if (c === 'id') return `${index + 1}`;
         if (c === 'name') return t;
-        if (c === 'note') return note;
+        if (c === 'notes') return note;
         return '';
       });
       
@@ -238,7 +238,7 @@ export class TaskService {
       if (c === 'status') return '[ ]';
       if (c === 'id') return newId;
       if (c === 'name') return taskName;
-      if (c === 'note') return note || '';
+      if (c === 'notes') return note || '';
       return '';
     });
     
@@ -302,7 +302,7 @@ export class TaskService {
         if (c === 'status') return '[ ]';
         if (c === 'id') return newId;
         if (c === 'name') return task.name;
-        if (c === 'note') return task.note || '';
+        if (c === 'notes') return task.note || '';
         return '';
       });
       rows.push(rowData);
