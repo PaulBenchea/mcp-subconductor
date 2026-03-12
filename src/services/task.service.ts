@@ -774,9 +774,13 @@ export class TaskService {
     const goal = goalMatch ? goalMatch[1].trim() : 'Unknown Goal';
 
     const normalizedPath = filePath.replace(/\\/g, '/');
-    const match = normalizedPath.match(/checklists\/([^\/]+)\/checklist\.md/);
-    if (match) {
-      await this.updateChecklistsIndex(match[1], goal, resolved, total, isDone ? ChecklistStatus.Done : ChecklistStatus.Active);
+    const archiveMatch = normalizedPath.match(/archive\/checklists\/([^\/]+)\/checklist\.md/);
+    const standardMatch = normalizedPath.match(/checklists\/([^\/]+)\/checklist\.md/);
+    
+    if (archiveMatch) {
+      await this.updateChecklistsIndex(archiveMatch[1], goal, resolved, total, ChecklistStatus.Archived);
+    } else if (standardMatch) {
+      await this.updateChecklistsIndex(standardMatch[1], goal, resolved, total, isDone ? ChecklistStatus.Done : ChecklistStatus.Active);
     }
 
     return isDone;
