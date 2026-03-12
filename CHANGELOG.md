@@ -19,6 +19,9 @@ All notable changes to this project will be documented in this file.
 - **Enum-based Status Tracking**: Deprecated textual bracket strings (`[ ]`, `[x]`) in favor of strongly-typed `Idle` and `Done` text tracking inside Markdown tables.
 - **Codebase Standardization**: Systematically refactored the core library to remove all ambiguous variable abbreviations, improving strict typing, enum-based configuration, and maintainability.
 
+### Fixed
+- **Archive Duplication**: Fixed a bug where archiving a checklist duplicated its row entry in the `checklists.md` index file instead of properly updating its path.
+
 ## [1.1.0] - 2026-03-05
 
 ### Added

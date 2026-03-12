@@ -59,11 +59,23 @@ Appends a new task to the active checklist dynamically.
   - `note` (string, optional): An optional note.
 - **Effect**: Appends the task, automatically assigns a monotonic immutable ID, and updates the completion header.
 
+### `add_tasks`
+Appends multiple new tasks to the active checklist dynamically.
+- **Arguments**: 
+  - `tasks` (array): List of tasks to add (objects with `name` and optional `note`).
+- **Effect**: Appends all tasks sequentially, automatically assigning immutable IDs.
+
 ### `remove_task`
 Deletes a task from the active checklist.
 - **Arguments**: 
   - `task` (string): The task ID (e.g., "1") or the full task name.
 - **Effect**: Removes the task row and updates the completion header. Note: Existing task IDs remain immutable and are not shifted.
+
+### `remove_tasks`
+Deletes multiple tasks from the active checklist in a single batch operation.
+- **Arguments**: 
+  - `tasks` (array): List of task IDs or names to remove.
+- **Effect**: Removes all specified task rows safely.
 
 ### `mark_task_done`
 Updates a specific task's status to completed in the active checklist.
@@ -72,18 +84,23 @@ Updates a specific task's status to completed in the active checklist.
   - `note` (string, optional): An additional note or status message.
 - **Effect**: Updates the status to `Done` and records the note in the `Notes` column. Automatically triggers a notification upon completion of the final task in the active checklist.
 
+### `mark_tasks_done`
+Updates multiple tasks' statuses to completed in the active checklist.
+- **Arguments**: 
+  - `tasks` (array): List of objects containing `name` (ID or task name) and an optional `note`.
+- **Effect**: Marks all specified tasks as `Done` and evaluates overall checklist completion.
+
 ### `unmark_task`
 Reverts a completed task back to pending status.
 - **Arguments**:
   - `task` (string): The task ID (e.g., "1") or the full task name.
-- **Effect**: Reverts status to `Idle`, clears associated notes, and rolls back the completion goal header.
+- **Effect**: Reverts status to `Pending` (Idle), clears associated notes, and rolls back the completion goal header.
 
-### Batch Operations
-If batch operations are enabled, the following multi-task variants of the above tools are also available:
-- `add_tasks`: Adds an array of tasks.
-- `remove_tasks`: Safely deletes an array of task IDs.
-- `mark_tasks_done`: Marks an array of tasks complete.
-- `unmark_tasks`: Reverts an array of tasks to idle.
+### `unmark_tasks`
+Reverts multiple completed tasks back to pending status in a single batch operation.
+- **Arguments**:
+  - `tasks` (array): List of task IDs or names to unmark.
+- **Effect**: Reverts all specified tasks to `Pending` (Idle).
 
 ### `alert`
 Sends a system-level notification with sound and icon support.
