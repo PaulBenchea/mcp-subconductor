@@ -10,3 +10,9 @@ export enum TaskColumn {
   Name = 'Name',
   Notes = 'Notes'
 }
+
+export enum ChecklistStatus {
+  Active = 'Active',
+  Idle = 'Idle',
+  Done = 'Done'
+}
