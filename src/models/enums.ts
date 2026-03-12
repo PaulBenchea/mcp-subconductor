@@ -14,5 +14,11 @@ export enum TaskColumn {
 export enum ChecklistStatus {
   Active = 'Active',
   Idle = 'Idle',
+  Done = 'Done',
+  Archived = 'Archived'
+}
+
+export enum TaskStatus {
+  Idle = 'Idle',
   Done = 'Done'
 }
