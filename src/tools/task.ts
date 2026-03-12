@@ -28,6 +28,32 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
   );
 
   server.registerTool(
+    'activate_checklist',
+    {
+      description: 'Activate a previously initialized checklist by its goal name or a substring of it. The activated checklist will receive all subsequent task operations.',
+      inputSchema: {
+        checklistName: z.string().describe('The goal name of the checklist to activate, or a distinctive part of it.')
+      }
+    },
+    async ({ checklistName }) => {
+      try {
+        const success = await taskService.activateChecklist(checklistName);
+        return {
+          content: [{
+            type: 'text',
+            text: success ? `Activated checklist matching "${checklistName}".` : `No checklist found matching "${checklistName}".`
+          }]
+        };
+      }
+      catch (error: any) {
+        return {
+          content: [{ type: 'text', text: `Error: ${error.message}` }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     'get_pending_task',
     {
       description: 'Retrieve the next single pending task from the active checklist. Returns "DONE" if all tasks are finished. Tasks are returned with an ID (e.g., "(#1) Task Name") which can be used to reference them efficiently.'
