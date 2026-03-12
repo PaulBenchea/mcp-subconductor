@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { CHECKLISTS_DIR, CHECKLISTS_INDEX_FILE, TASK_FILE, WORKING_DIR } from '../models/constants.js';
+import { CHECKLISTS_DIR, CHECKLISTS_INDEX_FILE, TASK_FILE, WORKING_DIR, ARCHIVE_DIR } from '../models/constants.js';
 import { AlertType, ChecklistStatus, TaskColumn, TaskStatus } from '../models/enums.js';
 import type { TaskInput } from '../models/interfaces.js';
 import { notificationService } from './notification.service.js';
@@ -112,6 +112,82 @@ export class TaskService {
     await this.updateChecklistsIndex(shortName, sanitizedGoal, 0, tasks.length, ChecklistStatus.Active);
 
     return tasks.length;
+  }
+
+  async archiveChecklist(checklistIdentifier: string): Promise<boolean> {
+    await this.ensureInit();
+    try { await fs.mkdir(ARCHIVE_DIR, { recursive: true }); } catch (error) {}
+    
+    let indexData = '';
+    try {
+      indexData = await fs.readFile(CHECKLISTS_INDEX_FILE, 'utf-8');
+    } catch (error) {
+      return false;
+    }
+
+    const lines = indexData.split('\n');
+    let targetIndex = -1;
+    let targetPath = '';
+    let targetGoal = '';
+    let targetIdStr = '';
+    let targetProgress = '';
+
+    const isNumericId = /^\d+$/.test(checklistIdentifier);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.startsWith('|') || line.includes('Status | ID | Progress') || line.includes(':---')) continue;
+      
+      const parts = line.split('|').map(p => p.trim());
+      if (parts.length < 6) continue;
+      
+      const id = parts[2];
+      const goal = parts[4];
+      
+      if ((isNumericId && id === checklistIdentifier) || (!isNumericId && goal.toLowerCase().includes(checklistIdentifier.toLowerCase()))) {
+        targetIndex = i;
+        targetIdStr = id;
+        targetProgress = parts[3];
+        targetGoal = goal;
+        const pathMatch = parts[5].match(/\((.*?)\)/);
+        if (pathMatch) targetPath = pathMatch[1];
+        break;
+      }
+    }
+
+    if (targetIndex === -1 || !targetPath) return false;
+
+    // The current path could be './checklists/slug/checklist.md'
+    const fullSourceDir = path.dirname(path.join(WORKING_DIR, targetPath));
+    const folderName = path.basename(fullSourceDir);
+    const fullTargetDir = path.join(ARCHIVE_DIR, folderName);
+    
+    try {
+      await fs.rename(fullSourceDir, fullTargetDir);
+    } catch (error) {
+      // If it fails to move (e.g. across drives, though unlikely here), try to continue or throw
+      throw new Error(`Failed to move checklist folder to archive: ${error}`);
+    }
+
+    const newRelativePath = `./archive/checklists/${folderName}/checklist.md`;
+    const newEntry = `| ${ChecklistStatus.Archived} | ${targetIdStr} | ${targetProgress} | ${targetGoal} | [Link](${newRelativePath}) |`;
+
+    const updatedLines = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (i === targetIndex) {
+        updatedLines.push(newEntry);
+      } else {
+        updatedLines.push(lines[i]);
+      }
+    }
+
+    await fs.writeFile(CHECKLISTS_INDEX_FILE, updatedLines.join('\n'));
+    
+    // We should also sync the header in the moved file to update its internal path logic if needed, 
+    // though the inner file doesn't currently store its own relative path. Just syncing to update file modified date.
+    await this.syncProgress(path.join(fullTargetDir, 'checklist.md'));
+
+    return true;
   }
 
   async activateChecklist(checklistIdentifier: string): Promise<boolean> {
