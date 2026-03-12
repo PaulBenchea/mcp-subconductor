@@ -7,7 +7,7 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
   server.registerTool(
     'init_checklist',
     {
-      description: 'Initialize a new task checklist for the current subconductor run. This tool creates a task table with Status, ID, Name, and optional custom columns (like Notes).',
+      description: 'Initialize a new task checklist for the current subconductor run. This tool creates a task table with Status, ID, Name, and optional custom columns. It also natively sets up goal tracking to monitor completion progress.',
       inputSchema: {
         tasks: z.array(
           z.object({
@@ -96,7 +96,7 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
   server.registerTool(
     'add_task',
     {
-      description: 'Add a new task to the active checklist.',
+      description: 'Add a new task to the active checklist. The task is appended to the end of the list and automatically assigned a new ID.',
       inputSchema: {
         name: z.string().describe('The name of the task to add'),
         note: z.string().optional().describe('An optional note for the task')
@@ -118,7 +118,7 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
   server.registerTool(
     'remove_task',
     {
-      description: 'Remove a task from the active checklist.',
+      description: 'Remove a task from the active checklist. Warning: Removing a task will automatically re-index the IDs of all subsequent tasks in the checklist.',
       inputSchema: {
         task: z.string().describe('The task ID (e.g., "1") or task name to remove')
       }
@@ -217,9 +217,8 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
     server.registerTool(
       'add_tasks',
       {
-        description: 'Add multiple new tasks to the active checklist.',
-        inputSchema: {
-          tasks: z.array(z.object({
+        description: 'Add multiple new tasks to the active checklist. Tasks are appended to the end of the list and automatically assigned new IDs.',
+        inputSchema: {          tasks: z.array(z.object({
             name: z.string().describe('The name of the task to add'),
             note: z.string().optional().describe('An optional note for the task')
           })).describe('List of tasks to add')
@@ -240,9 +239,8 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
     server.registerTool(
       'remove_tasks',
       {
-        description: 'Remove multiple tasks from the active checklist.',
-        inputSchema: {
-          tasks: z.array(z.string().describe('The task ID (e.g., "1") or task name to remove')).describe('List of tasks to remove')
+        description: 'Remove multiple tasks from the active checklist. Safe for batch deletion, as remaining tasks are dynamically re-indexed only after all specified removals are processed.',
+        inputSchema: {          tasks: z.array(z.string().describe('The task ID (e.g., "1") or task name to remove')).describe('List of tasks to remove')
         }
       },
       async ({ tasks }) => {
