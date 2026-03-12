@@ -51,10 +51,8 @@ export class TaskService {
     if (lines.length < 2) throw new Error('Invalid task table format.');
 
     const columns = lines[0].split('|').map(c => c.trim()).filter(c => c !== '');
-    // Skip separator line at lines[1]
     const rows = lines.slice(2).map(line => {
       const cells = line.split('|').map(c => c.trim());
-      // Filter out the empty strings from the start and end due to leading/trailing pipes
       return cells.slice(1, -1);
     });
 
