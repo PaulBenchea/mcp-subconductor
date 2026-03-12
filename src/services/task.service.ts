@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { CHECKLISTS_DIR, CHECKLISTS_INDEX_FILE, TASK_FILE, WORKING_DIR } from '../models/constants.js';
-import { AlertType, ChecklistStatus, TaskColumn } from '../models/enums.js';
+import { AlertType, ChecklistStatus, TaskColumn, TaskStatus } from '../models/enums.js';
 import type { TaskInput } from '../models/interfaces.js';
 import { notificationService } from './notification.service.js';
 
@@ -89,7 +89,7 @@ export class TaskService {
       const rowData: string[] = headers.map(column => {
         const columnLower = column.toLowerCase();
         if (columnLower === TaskColumn.Status.toLowerCase()) {
-          return ChecklistStatus.Idle;
+          return TaskStatus.Idle;
         }
         if (columnLower === TaskColumn.ID.toLowerCase()) {
           return `${index + 1}`;
@@ -189,7 +189,7 @@ export class TaskService {
       const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
       const nameIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Name.toLowerCase());
 
-      const pendingRow = rows.find(row => row[statusIndex] === ChecklistStatus.Idle);
+      const pendingRow = rows.find(row => row[statusIndex] === TaskStatus.Idle);
       if (!pendingRow) {
         return null;
       }
@@ -212,7 +212,7 @@ export class TaskService {
       const nameIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Name.toLowerCase());
 
       return rows
-        .filter(row => row[statusIndex] === ChecklistStatus.Idle)
+        .filter(row => row[statusIndex] === TaskStatus.Idle)
         .slice(0, count)
         .map(row => `(#${row[idIndex]}) ${row[nameIndex]}`);
     }
@@ -259,7 +259,7 @@ export class TaskService {
     const isNumericId = /^\d+$/.test(cleanId);
 
     const taskRowIndex = rows.findIndex(row => {
-      if (row[statusIndex] !== ChecklistStatus.Idle) {
+      if (row[statusIndex] !== TaskStatus.Idle) {
         return false;
       }
       if (isNumericId && row[idIndex] === cleanId) {
@@ -273,7 +273,7 @@ export class TaskService {
       return false;
     }
 
-    rows[taskRowIndex][statusIndex] = ChecklistStatus.Done;
+    rows[taskRowIndex][statusIndex] = TaskStatus.Done;
 
     if (note) {
       let notesIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Notes.toLowerCase() || column.toLowerCase() === 'notes');
@@ -315,7 +315,7 @@ export class TaskService {
     const isNumericId = /^\d+$/.test(cleanId);
 
     const taskRowIndex = rows.findIndex(row => {
-      if (row[statusIndex] !== ChecklistStatus.Done) {
+      if (row[statusIndex] !== TaskStatus.Done) {
         return false;
       }
       if (isNumericId && row[idIndex] === cleanId) {
@@ -331,7 +331,7 @@ export class TaskService {
       return false;
     }
 
-    rows[taskRowIndex][statusIndex] = ChecklistStatus.Idle;
+    rows[taskRowIndex][statusIndex] = TaskStatus.Idle;
     if (notesIndex !== -1) {
       rows[taskRowIndex][notesIndex] = '';
     }
@@ -368,7 +368,7 @@ export class TaskService {
     const rowData: string[] = columns.map(column => {
       const columnLower = column.toLowerCase();
       if (columnLower === TaskColumn.Status.toLowerCase()) {
-        return ChecklistStatus.Idle;
+        return TaskStatus.Idle;
       }
       if (columnLower === TaskColumn.ID.toLowerCase()) {
         return newId;
@@ -462,7 +462,7 @@ export class TaskService {
       const rowData: string[] = columns.map(column => {
         const columnLower = column.toLowerCase();
         if (columnLower === TaskColumn.Status.toLowerCase()) {
-          return ChecklistStatus.Idle;
+          return TaskStatus.Idle;
         }
         if (columnLower === TaskColumn.ID.toLowerCase()) {
           return newId;
@@ -654,10 +654,10 @@ export class TaskService {
 
       if (statusIndex !== -1 && cells[statusIndex]) {
         if (cells[statusIndex] === '[ ]') {
-          cells[statusIndex] = ChecklistStatus.Idle;
+          cells[statusIndex] = TaskStatus.Idle;
         }
         if (cells[statusIndex] === '[x]') {
-          cells[statusIndex] = ChecklistStatus.Done;
+          cells[statusIndex] = TaskStatus.Done;
         }
       }
 
@@ -687,7 +687,7 @@ export class TaskService {
 
     const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
     const total = rows.length;
-    const resolved = rows.filter(row => row[statusIndex] === ChecklistStatus.Done).length;
+    const resolved = rows.filter(row => row[statusIndex] === TaskStatus.Done).length;
     const isDone = total > 0 && resolved === total;
 
     goalSection = this.updateGoalHeader(goalSection, resolved, total);
