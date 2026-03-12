@@ -391,7 +391,18 @@ export class TaskService {
     
     const { columns, rows } = this.parseTable(tableData);
     
-    const newId = (rows.length + 1).toString();
+    const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
+    let maxId = 0;
+    if (idIndex !== -1) {
+      for (const row of rows) {
+        const idVal = parseInt(row[idIndex], 10);
+        if (!isNaN(idVal) && idVal > maxId) {
+          maxId = idVal;
+        }
+      }
+    }
+    
+    const newId = (maxId + 1).toString();
     const rowData: string[] = columns.map(column => {
       const columnLower = column.toLowerCase();
       if (columnLower === TaskColumn.Status.toLowerCase()) return ChecklistStatus.Idle;
@@ -459,8 +470,20 @@ export class TaskService {
     const { columns, rows } = this.parseTable(tableData);
     const results: { name: string, id: string }[] = [];
     
+    const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
+    let maxId = 0;
+    if (idIndex !== -1) {
+      for (const row of rows) {
+        const idVal = parseInt(row[idIndex], 10);
+        if (!isNaN(idVal) && idVal > maxId) {
+          maxId = idVal;
+        }
+      }
+    }
+    
     for (const task of tasks) {
-      const newId = (rows.length + 1).toString();
+      maxId++;
+      const newId = maxId.toString();
       const rowData: string[] = columns.map(column => {
         const columnLower = column.toLowerCase();
         if (columnLower === TaskColumn.Status.toLowerCase()) return ChecklistStatus.Idle;
