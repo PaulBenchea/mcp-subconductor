@@ -36,6 +36,12 @@ Switch the active context to a different, previously initialized checklist.
   - `checklistName` (string): The numeric ID from the index, or a partial string match of the checklist's goal name.
 - **Effect**: Updates `.subconductor/checklists.md` to mark the targeted checklist as `Active` and all others as `Idle`.
 
+### `archive_checklist`
+Moves a checklist to the archive directory to keep the active index clean.
+- **Arguments**: 
+  - `checklistIdentifier` (string): The numeric ID from the index, or a partial string match of the checklist's goal name.
+- **Effect**: Moves the checklist folder to `.subconductor/archive/checklists/` and updates its status to `Archived` in the index table.
+
 ### `get_pending_task`
 Retrieves the next uncompleted task from the active checklist.
 - **Effect**: Returns the first task with an ID prefix (e.g., `(#1) Task Name`). Returns `DONE` if all tasks are completed.

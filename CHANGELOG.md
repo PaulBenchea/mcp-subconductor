@@ -6,8 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **Multiple Checklists**: Transitioned storage mechanism to support multiple independent checklists organized within a `.subconductor/checklists` directory.
-- **Checklists Index**: Introduced a central `.subconductor/checklists.md` index file tracking active, idle, and completed checklists.
+- **Checklists Index**: Introduced a central `.subconductor/checklists.md` index file tracking active, idle, completed, and archived checklists.
 - **Checklist Activation**: Introduced the `activate_checklist` tool allowing explicit switching between tracked checklists using their numeric index ID or goal name.
+- **Checklist Archiving**: Introduced the `archive_checklist` tool allowing users to move inactive checklists into `.subconductor/archive/checklists/` to keep their workspace clean.
 - **Dynamic Task Management**: Introduced `add_task`, `add_tasks`, `remove_task`, and `remove_tasks` tools for runtime modifications of active checklists.
 - **Initial Notes Support**: Task initialization natively supports inputting tasks as objects with pre-populated `note` values.
 - **Goal Progress Tracking**: Integrated visual progress tracking (`[resolved/total]`) directly in the header of the active checklist file and the central index.
