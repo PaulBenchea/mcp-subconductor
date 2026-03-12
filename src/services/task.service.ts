@@ -43,6 +43,9 @@ export class TaskService {
     try {
       const indexData = await fs.readFile(CHECKLISTS_INDEX_FILE, 'utf-8');
       const lines = indexData.split('\n');
+      
+      let firstAvailablePath = null;
+      
       for (const line of lines) {
         if (line.includes(ChecklistStatus.Active)) {
           const match = line.match(/\((.*?)\)/);
@@ -50,6 +53,17 @@ export class TaskService {
             return path.join(WORKING_DIR, match[1]);
           }
         }
+        
+        if (!firstAvailablePath && (line.includes(ChecklistStatus.Idle) || line.includes(ChecklistStatus.Done))) {
+          const match = line.match(/\((.*?)\)/);
+          if (match) {
+            firstAvailablePath = path.join(WORKING_DIR, match[1]);
+          }
+        }
+      }
+      
+      if (firstAvailablePath) {
+        return firstAvailablePath;
       }
     } catch (error) {}
     
@@ -146,7 +160,7 @@ export class TaskService {
       
       const rowData: string[] = headers.map(column => {
         const columnLower = column.toLowerCase();
-        if (columnLower === TaskColumn.Status.toLowerCase()) return '[ ]';
+        if (columnLower === TaskColumn.Status.toLowerCase()) return ChecklistStatus.Idle;
         if (columnLower === TaskColumn.ID.toLowerCase()) return `${index + 1}`;
         if (columnLower === TaskColumn.Name.toLowerCase()) return taskName;
         if (columnLower === TaskColumn.Notes.toLowerCase() || columnLower === 'notes') return note;
@@ -169,9 +183,17 @@ export class TaskService {
     if (lines.length < 2) throw new Error('Invalid task table format.');
 
     const columns = lines[0].split('|').map(column => column.trim()).filter(column => column !== '');
+    const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
+
     const rows = lines.slice(2).map(line => {
-      const cells = line.split('|').map(cell => cell.trim());
-      return cells.slice(1, -1);
+      const cells = line.split('|').map(cell => cell.trim()).slice(1, -1);
+      
+      if (statusIndex !== -1 && cells[statusIndex]) {
+        if (cells[statusIndex] === '[ ]') cells[statusIndex] = ChecklistStatus.Idle;
+        if (cells[statusIndex] === '[x]') cells[statusIndex] = ChecklistStatus.Done;
+      }
+      
+      return cells;
     });
 
     return { columns, rows };
@@ -197,7 +219,7 @@ export class TaskService {
     
     const statusIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Status.toLowerCase());
     const total = rows.length;
-    const resolved = rows.filter(row => row[statusIndex] === '[x]').length;
+    const resolved = rows.filter(row => row[statusIndex] === ChecklistStatus.Done).length;
     const isDone = total > 0 && resolved === total;
     
     goalSection = this.updateGoalHeader(goalSection, resolved, total);
@@ -226,7 +248,7 @@ export class TaskService {
       const idIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.ID.toLowerCase());
       const nameIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Name.toLowerCase());
 
-      const pendingRow = rows.find(row => row[statusIndex] === '[ ]');
+      const pendingRow = rows.find(row => row[statusIndex] === ChecklistStatus.Idle);
       if (!pendingRow) return null;
 
       return `(#${pendingRow[idIndex]}) ${pendingRow[nameIndex]}`;
@@ -246,7 +268,7 @@ export class TaskService {
       const nameIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Name.toLowerCase());
 
       return rows
-        .filter(row => row[statusIndex] === '[ ]')
+        .filter(row => row[statusIndex] === ChecklistStatus.Idle)
         .slice(0, count)
         .map(row => `(#${row[idIndex]}) ${row[nameIndex]}`);
     } catch (error) {
@@ -289,7 +311,7 @@ export class TaskService {
     const isNumericId = /^\d+$/.test(cleanId);
 
     const taskRowIndex = rows.findIndex(row => {
-      if (row[statusIndex] !== '[ ]') return false;
+      if (row[statusIndex] !== ChecklistStatus.Idle) return false;
       if (isNumericId && row[idIndex] === cleanId) return true;
       if (row[nameIndex] === taskIdentifier) return true;
       return false;
@@ -297,7 +319,7 @@ export class TaskService {
 
     if (taskRowIndex === -1) return false;
 
-    rows[taskRowIndex][statusIndex] = '[x]';
+    rows[taskRowIndex][statusIndex] = ChecklistStatus.Done;
     
     if (note) {
       let notesIndex = columns.findIndex(column => column.toLowerCase() === TaskColumn.Notes.toLowerCase() || column.toLowerCase() === 'notes');
@@ -339,7 +361,7 @@ export class TaskService {
     const isNumericId = /^\d+$/.test(cleanId);
 
     const taskRowIndex = rows.findIndex(row => {
-      if (row[statusIndex] !== '[x]') return false;
+      if (row[statusIndex] !== ChecklistStatus.Done) return false;
       if (isNumericId && row[idIndex] === cleanId) return true;
       if (row[nameIndex] === taskIdentifier) return true;
       return false;
@@ -347,7 +369,7 @@ export class TaskService {
 
     if (taskRowIndex === -1) return false;
 
-    rows[taskRowIndex][statusIndex] = '[ ]';
+    rows[taskRowIndex][statusIndex] = ChecklistStatus.Idle;
     if (notesIndex !== -1) {
       rows[taskRowIndex][notesIndex] = '';
     }
@@ -372,7 +394,7 @@ export class TaskService {
     const newId = (rows.length + 1).toString();
     const rowData: string[] = columns.map(column => {
       const columnLower = column.toLowerCase();
-      if (columnLower === TaskColumn.Status.toLowerCase()) return '[ ]';
+      if (columnLower === TaskColumn.Status.toLowerCase()) return ChecklistStatus.Idle;
       if (columnLower === TaskColumn.ID.toLowerCase()) return newId;
       if (columnLower === TaskColumn.Name.toLowerCase()) return taskName;
       if (columnLower === TaskColumn.Notes.toLowerCase() || columnLower === 'notes') return note || '';
@@ -441,7 +463,7 @@ export class TaskService {
       const newId = (rows.length + 1).toString();
       const rowData: string[] = columns.map(column => {
         const columnLower = column.toLowerCase();
-        if (columnLower === TaskColumn.Status.toLowerCase()) return '[ ]';
+        if (columnLower === TaskColumn.Status.toLowerCase()) return ChecklistStatus.Idle;
         if (columnLower === TaskColumn.ID.toLowerCase()) return newId;
         if (columnLower === TaskColumn.Name.toLowerCase()) return task.name;
         if (columnLower === TaskColumn.Notes.toLowerCase() || columnLower === 'notes') return task.note || '';
