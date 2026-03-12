@@ -55,6 +55,33 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
   );
 
   server.registerTool(
+    'archive_checklist',
+    {
+      description: 'Archive a checklist by its goal name, a substring of it, or its numeric ID. The checklist will be moved to the archive directory and marked as Archived in the global index.',
+      inputSchema: {
+        checklistIdentifier: z.string().describe('The goal name, a distinctive part of it, or the numeric ID of the checklist to archive.')
+      }
+    },
+    async ({ checklistIdentifier }) => {
+      try {
+        const success = await taskService.archiveChecklist(checklistIdentifier);
+        return {
+          content: [{
+            type: 'text',
+            text: success ? `Archived checklist matching "${checklistIdentifier}".` : `No checklist found matching "${checklistIdentifier}".`
+          }]
+        };
+      }
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: 'text', text: `Error: ${message}` }]
+        };
+      }
+    }
+  );
+
+  server.registerTool(
     'get_pending_task',
     {
       description: 'Retrieve the next single pending task from the active checklist. Returns "DONE" if all tasks are finished. Tasks are returned with an ID (e.g., "(#1) Task Name") which can be used to reference them efficiently.'
