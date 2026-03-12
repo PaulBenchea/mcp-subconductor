@@ -45,9 +45,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
           }]
         };
       }
-      catch (error: any) {
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Error: ${error.message}` }]
+          content: [{ type: 'text', text: `Error: ${message}` }]
         };
       }
     }
@@ -92,9 +93,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
           }]
         };
       }
-      catch (error: any) {
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: 'text', text: `Error: ${error.message}` }]
+          content: [{ type: 'text', text: `Error: ${message}` }]
         };
       }
     }
