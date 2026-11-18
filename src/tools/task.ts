@@ -1,9 +1,68 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import fs from 'fs/promises';
+import { WORKFLOW_FILE } from '../models/constants.js';
 import type { McpSettings } from '../models/interfaces.js';
 import { taskService } from '../services/task.service.js';
+import { projectService } from '../services/project.service.js';
+
+const INIT_ERROR = 'Subconductor is NOT initialized for this project. To use Subconductor\'s tracking and alerting capabilities, you MUST first run the "analyze_project" prompt to establish context.';
 
 export function registerTaskTools(server: McpServer, settings: McpSettings) {
+  server.registerPrompt(
+    "analyze_project",
+    {
+      description: "Scan the project and analyze critical project information for better context."
+    },
+    async () => {
+      const analysis = await projectService.analyzeProject();
+      return {
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: analysis
+            }
+          }
+        ]
+      };
+    }
+  );
+
+  server.registerPrompt(
+    "activate_workflow",
+    {
+      description: "Strictly track complex multi-step workflows, prevent context drift, and recover session state using the Subconductor mechanism."
+    },
+    async () => {
+      if (!(await projectService.isInitialized())) {
+         return {
+           messages: [{ role: "user", content: { type: "text", text: INIT_ERROR } }]
+         };
+      }
+
+      let workflowContent = '';
+      try {
+        workflowContent = await fs.readFile(WORKFLOW_FILE, 'utf-8');
+      } catch (error) {
+        workflowContent = `Error reading workflow file: ${error instanceof Error ? error.message : String(error)}`;
+      }
+
+      return {
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: workflowContent
+            }
+          }
+        ]
+      };
+    }
+  );
+
   server.registerTool(
     'init_checklist',
     {
@@ -20,6 +79,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       }
     },
     async ({ tasks, goal, columns }) => {
+      if (!(await projectService.isInitialized())) {
+        return { content: [{ type: 'text', text: INIT_ERROR }] };
+      }
+
       const count = await taskService.initChecklist(tasks, goal, columns);
       return {
         content: [{ type: 'text', text: `Checklist created with ${count} tasks.` }]
@@ -36,6 +99,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       }
     },
     async ({ checklistName }) => {
+      if (!(await projectService.isInitialized())) {
+        return { content: [{ type: 'text', text: INIT_ERROR }] };
+      }
+
       try {
         const success = await taskService.activateChecklist(checklistName);
         return {
@@ -63,6 +130,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       }
     },
     async ({ checklistIdentifier }) => {
+      if (!(await projectService.isInitialized())) {
+        return { content: [{ type: 'text', text: INIT_ERROR }] };
+      }
+
       try {
         const success = await taskService.archiveChecklist(checklistIdentifier);
         return {
@@ -87,6 +158,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       description: 'Retrieve the next single pending task from the active checklist. Returns "DONE" if all tasks are finished. Tasks are returned with an ID (e.g., "(#1) Task Name") which can be used to reference them efficiently.'
     },
     async () => {
+      if (!(await projectService.isInitialized())) {
+        return { content: [{ type: 'text', text: INIT_ERROR }] };
+      }
+
       try {
         const task = await taskService.getPendingTask();
         return {
@@ -111,6 +186,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       }
     },
     async ({ task, note }) => {
+      if (!(await projectService.isInitialized())) {
+        return { content: [{ type: 'text', text: INIT_ERROR }] };
+      }
+
       try {
         const success = await taskService.markTaskDone(task, note);
         return {
@@ -138,6 +217,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       }
     },
     async ({ task }) => {
+      if (!(await projectService.isInitialized())) {
+        return { content: [{ type: 'text', text: INIT_ERROR }] };
+      }
+
       const success = await taskService.unmarkTask(task);
       return {
         content: [{
@@ -158,6 +241,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       }
     },
     async ({ name, note }) => {
+      if (!(await projectService.isInitialized())) {
+        return { content: [{ type: 'text', text: INIT_ERROR }] };
+      }
+
       try {
         const result = await taskService.addTask(name, note);
         return {
@@ -179,6 +266,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
       }
     },
     async ({ task }) => {
+      if (!(await projectService.isInitialized())) {
+        return { content: [{ type: 'text', text: INIT_ERROR }] };
+      }
+
       try {
         const success = await taskService.removeTask(task);
         return {
@@ -204,6 +295,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
         }
       },
       async ({ count }) => {
+        if (!(await projectService.isInitialized())) {
+          return { content: [{ type: 'text', text: INIT_ERROR }] };
+        }
+
         try {
           const tasks = await taskService.getPendingTasks(count);
           return {
@@ -221,7 +316,7 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
     server.registerTool(
       'mark_tasks_done',
       {
-        description: 'Mark multiple tasks as completed in a single batch operation. You can reference tasks by their ID (e.g., "1" or "#1") or by their full name. This is efficient when several tasks are finished simultaneously. Like mark_task_done, you can optionally provide a note for each task to document progress or results.',
+        description: 'Mark multiple tasks as completed in a single batch operation. You can reference tasks by their ID (e.g., "1" or "#1") for efficiency, or by its full name. This is efficient when several tasks are finished simultaneously. Like mark_task_done, you can optionally provide a note for each task to document progress or results.',
         inputSchema: {
           tasks: z.array(z.object({
             name: z.string().describe('The task ID (e.g., "1") or task name'),
@@ -230,6 +325,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
         }
       },
       async ({ tasks }) => {
+        if (!(await projectService.isInitialized())) {
+          return { content: [{ type: 'text', text: INIT_ERROR }] };
+        }
+
         try {
           const results = await taskService.markTasksDone(tasks);
           const summary = results.map(result => `${result.name}: ${result.success ? 'Success' : 'Failed'}`).join('\n');
@@ -248,12 +347,16 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
     server.registerTool(
       'unmark_tasks',
       {
-        description: 'Revert multiple completed tasks back to pending status in a single batch operation. You can reference tasks by their ID (e.g., "1" or "#1") or by their full name.',
+        description: 'Revert multiple completed tasks back to pending status in a single batch operation. You can reference tasks by their ID (e.g., "1" or "#1") or by its full name.',
         inputSchema: {
           tasks: z.array(z.string().describe('The task ID (e.g., "1") or task name')).describe('List of tasks to unmark')
         }
       },
       async ({ tasks }) => {
+        if (!(await projectService.isInitialized())) {
+          return { content: [{ type: 'text', text: INIT_ERROR }] };
+        }
+
         try {
           const results = await taskService.unmarkTasks(tasks);
           const summary = results.map(result => `${result.name}: ${result.success ? 'Success' : 'Failed'}`).join('\n');
@@ -280,6 +383,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
         }
       },
       async ({ tasks }) => {
+        if (!(await projectService.isInitialized())) {
+          return { content: [{ type: 'text', text: INIT_ERROR }] };
+        }
+
         try {
           const results = await taskService.addTasks(tasks);
           const summary = results.map(result => `Added task: (#${result.id}) ${result.name}`).join('\n');
@@ -299,6 +406,10 @@ export function registerTaskTools(server: McpServer, settings: McpSettings) {
         }
       },
       async ({ tasks }) => {
+        if (!(await projectService.isInitialized())) {
+          return { content: [{ type: 'text', text: INIT_ERROR }] };
+        }
+
         try {
           const results = await taskService.removeTasks(tasks);
           const summary = results.map(result => `${result.name}: ${result.success ? 'Removed' : 'Not found'}`).join('\n');

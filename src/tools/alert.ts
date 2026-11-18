@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { AlertType } from '../models/enums.js';
 import type { McpSettings } from '../models/interfaces.js';
 import { notificationService } from '../services/notification.service.js';
+import { projectService } from '../services/project.service.js';
+
+const INIT_ERROR = 'Subconductor is NOT initialized for this project. To use Subconductor\'s tracking and alerting capabilities, you MUST first run the "analyze_project" prompt to establish context.';
 
 export function registerAlertTools(server: McpServer, settings: McpSettings) {
   if (settings.disableAlerts) {
@@ -21,6 +24,10 @@ export function registerAlertTools(server: McpServer, settings: McpSettings) {
       }
     },
     async ({ title, message, status }) => {
+      if (!(await projectService.isInitialized())) {
+        return { content: [{ type: 'text', text: INIT_ERROR }] };
+      }
+
       await notificationService.alert(title, message, status as AlertType);
       return {
         content: [{ type: 'text', text: `Notification sent: ${title}` }]
